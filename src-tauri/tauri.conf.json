@@ -18,8 +18,14 @@
         "minWidth": 900,
         "minHeight": 600,
         "decorations": true,
-        "transparent": false,
-        "center": true
+        "transparent": true,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "center": true,
+        "trafficLightPosition": {
+          "x": 16,
+          "y": 24
+        }
       }
     ],
     "security": {
@@ -42,8 +48,6 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": [
-      "resources/*"
-    ]
+    "resources": ["resources/*"]
   }
 }

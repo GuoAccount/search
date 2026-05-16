@@ -27,6 +27,7 @@ import {
   ScanEye,
 } from "lucide-react";
 import "./index.css";
+import "./App.css";
 
 interface ScanConfig {
   path: string;
@@ -472,37 +473,20 @@ function App() {
     );
   };
 
+  const isOpen = settings.sidebarOpen;
+
   return (
     <div className="app-container">
-      <div className="title-bar">
-        <div className="title-bar-left">
-          <button className="sidebar-toggle" onClick={() => updateSettings({ sidebarOpen: !settings.sidebarOpen })}>
-            {settings.sidebarOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
-          </button>
-          <div className="title-bar-title">
-            <Shield size={16} />
-            <span>FileScope</span>
-          </div>
-        </div>
-        <div className="title-bar-center">
-          {settings.scanPath && (
-            <div className="title-path">
-              <FolderOpen size={12} />
-              <span>{settings.scanPath}</span>
-            </div>
-          )}
-        </div>
-        <div className="title-bar-right">
-          <button className="title-bar-btn" onClick={handleSelectDirectory}>
-            <FolderOpen size={14} />
-            <span>选择目录</span>
-          </button>
-        </div>
-      </div>
+      <button className="fixed-toggle" onClick={() => updateSettings({ sidebarOpen: !settings.sidebarOpen })}>
+        {isOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
+      </button>
+      {/* Always render the same layout - sidebar + content */}
+      <div className={`main-wrap ${isOpen ? "is-open" : ""}`}>
 
-      <div className="main-content">
-        <div className={`sidebar ${settings.sidebarOpen ? "open" : ""}`}>
-          <div className="sidebar-content">
+        {/* Sidebar - always in DOM, hidden behind content when collapsed */}
+        <div className="sidebar-col">
+          <div className="sidebar-header" data-tauri-drag-region="deep" />
+          <div className="sidebar-scroll">
             <div className="sidebar-section">
               <div className="sidebar-section-title">
                 <SlidersHorizontal size={14} />
@@ -516,9 +500,7 @@ function App() {
                 return (
                   <div key={key} className={`preset-item ${isEnabled ? "active" : ""}`}>
                     <div className="preset-header" onClick={() => handleTogglePreset(key)}>
-                      <div className="preset-checkbox">
-                        {isEnabled && <Check size={10} />}
-                      </div>
+                      <div className="preset-checkbox">{isEnabled && <Check size={10} />}</div>
                       <Icon size={15} className="preset-icon" />
                       <span className="preset-label">{preset.label}</span>
                       <span className="preset-count">{preset.extensions.length + custom.length}</span>
@@ -526,37 +508,14 @@ function App() {
                     {isEnabled && (
                       <div className="preset-extensions">
                         <div className="ext-tags">
-                          {preset.extensions.map((ext) => (
-                            <span key={ext} className="ext-tag">{ext}</span>
-                          ))}
+                          {preset.extensions.map((ext) => <span key={ext} className="ext-tag">{ext}</span>)}
                           {custom.map((ext) => (
-                            <span key={ext} className="ext-tag ext-tag--custom">
-                              {ext}
-                              <button className="ext-remove" onClick={(e) => { e.stopPropagation(); handleRemoveExtension(key, ext); }}>
-                                <X size={8} />
-                              </button>
-                            </span>
+                            <span key={ext} className="ext-tag ext-tag--custom">{ext}<button className="ext-remove" onClick={(e) => { e.stopPropagation(); handleRemoveExtension(key, ext); }}><X size={8} /></button></span>
                           ))}
                         </div>
                         <div className="ext-add">
-                          <input
-                            type="text"
-                            className="ext-input"
-                            placeholder="添加扩展名"
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                handleAddExtension(key, e.currentTarget.value);
-                                e.currentTarget.value = "";
-                              }
-                            }}
-                          />
-                          <button className="ext-add-btn" onClick={(e) => {
-                            const input = (e.currentTarget.previousElementSibling as HTMLInputElement);
-                            handleAddExtension(key, input.value);
-                            input.value = "";
-                          }}>
-                            <Plus size={12} />
-                          </button>
+                          <input type="text" className="ext-input" placeholder="添加扩展名" onKeyDown={(e) => { if (e.key === "Enter") { handleAddExtension(key, e.currentTarget.value); e.currentTarget.value = ""; } }} />
+                          <button className="ext-add-btn" onClick={(e) => { const input = (e.currentTarget.previousElementSibling as HTMLInputElement); handleAddExtension(key, input.value); input.value = ""; }}><Plus size={12} /></button>
                         </div>
                       </div>
                     )}
@@ -564,194 +523,122 @@ function App() {
                 );
               })}
             </div>
-
             {settings.enabledPresets.includes("image") && (
               <div className="sidebar-section">
-                <div className="sidebar-section-title">
-                  <ScanEye size={14} />
-                  <span>图片 OCR</span>
-                </div>
+                <div className="sidebar-section-title"><ScanEye size={14} /><span>图片 OCR</span></div>
                 <div className="ocr-toggle">
                   <label className="toggle-switch">
-                    <input
-                      type="checkbox"
-                      checked={settings.ocrEnabled}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          // Check if platform is Linux
-                          const platform = navigator.platform.toLowerCase();
-                          if (platform.includes("linux")) {
-                            alert("Linux 平台暂不支持 OCR 功能");
-                            return;
-                          }
-                        }
-                        updateSettings({ ocrEnabled: e.target.checked });
-                      }}
-                    />
+                    <input type="checkbox" checked={settings.ocrEnabled} onChange={(e) => { if (e.target.checked) { const p = navigator.platform.toLowerCase(); if (p.includes("linux")) { alert("Linux 平台暂不支持 OCR 功能"); return; } } updateSettings({ ocrEnabled: e.target.checked }); }} />
                     <span className="toggle-slider"></span>
                   </label>
-                  <div className="toggle-info">
-                    <span className="toggle-label">启用文字识别</span>
-                    <span className="toggle-desc">识别图片中的文字内容</span>
-                  </div>
+                  <div className="toggle-info"><span className="toggle-label">启用文字识别</span><span className="toggle-desc">识别图片中的文字内容</span></div>
                 </div>
               </div>
             )}
-
             <div className="sidebar-footer">
-              <div className="sidebar-info">
-                <span>{selectedCount} 类 · {extCount} 种格式</span>
-                {settings.ocrEnabled && <span> · OCR 已启用</span>}
-              </div>
+              <div className="sidebar-info"><span>{selectedCount} 类 · {extCount} 种格式</span>{settings.ocrEnabled && <span> · OCR 已启用</span>}</div>
             </div>
           </div>
         </div>
 
-        <div className="main-panel">
-          <div className="search-bar">
-            <div className="search-row">
-              <div className="search-input-wrapper">
-                <Search size={15} className="search-icon" />
-                <input
-                  type="text"
-                  className="search-input"
-                  placeholder="输入关键字搜索文件..."
-                  value={settings.keyword}
-                  onChange={(e) => updateSettings({ keyword: e.target.value })}
-                  onKeyDown={(e) => e.key === "Enter" && !isScanning && handleStartScan()}
-                />
-              </div>
-              {isScanning ? (
-                <button className="search-btn" onClick={handleCancelScan}>
-                  <Loader2 size={14} className="spin" />
-                  <span>停止</span>
-                </button>
-              ) : (
-                <button className="search-btn" onClick={handleStartScan} disabled={!settings.scanPath || !settings.keyword || extCount === 0}>
-                  <Scan size={14} />
-                  <span>搜索</span>
-                </button>
+        {/* Content - always in DOM, slides left to cover sidebar when collapsed */}
+        <div className="content-col">
+          {/* Content Header - shows toggle + path when collapsed */}
+          <div className="content-header" data-tauri-drag-region="deep">
+            <div className="content-header-left">
+              {settings.scanPath && (
+                <div className="header-path"><FolderOpen size={12} /><span>{settings.scanPath}</span></div>
               )}
+            </div>
+            <div className="content-header-right">
+              <button className="content-header-btn" onClick={handleSelectDirectory}><FolderOpen size={13} /><span>选择目录</span></button>
             </div>
           </div>
 
-          {isScanning && (
-            <div className="scan-progress">
-              <div className="progress-bar">
-                <div className="progress-track" />
-              </div>
-              <div className="progress-info">
-                <div className="progress-stats">
-                  <span className="progress-count">已扫描 {scanProgress?.files_scanned || 0} 个文件</span>
-                  <span className="progress-found">找到 {scanProgress?.results_found || 0} 个结果</span>
+          <div className="content-body">
+            <div className="search-bar">
+              <div className="search-row">
+                <div className="search-input-wrapper">
+                  <Search size={15} className="search-icon" />
+                  <input type="text" className="search-input" placeholder="输入关键字搜索文件..." value={settings.keyword} onChange={(e) => updateSettings({ keyword: e.target.value })} onKeyDown={(e) => e.key === "Enter" && !isScanning && handleStartScan()} />
                 </div>
-                {scanProgress?.current_path && (
-                  <div className="progress-path" title={scanProgress.current_path}>
-                    <FolderOpen size={12} />
-                    <span>{scanProgress.current_path}</span>
-                  </div>
+                {isScanning ? (
+                  <button className="search-btn" onClick={handleCancelScan}><Loader2 size={14} className="spin" /><span>停止</span></button>
+                ) : (
+                  <button className="search-btn" onClick={handleStartScan} disabled={!settings.scanPath || !settings.keyword || extCount === 0}><Scan size={14} /><span>搜索</span></button>
                 )}
               </div>
             </div>
-          )}
-
-          {(scanProgress || isScanning) && (
-            <>
-              <div className="results-toolbar">
-                <div className="results-tabs">
-                  <button className={`tab ${activeTab === "all" ? "active" : ""}`} onClick={() => setActiveTab("all")}>
-                    全部 <span className="tab-badge">{tabCounts.all}</span>
-                  </button>
-                  {tabCounts.document > 0 && (
-                    <button className={`tab ${activeTab === "document" ? "active" : ""}`} onClick={() => setActiveTab("document")}>
-                      <FileText size={12} /> 文档 <span className="tab-badge">{tabCounts.document}</span>
-                    </button>
-                  )}
-                  {tabCounts.code > 0 && (
-                    <button className={`tab ${activeTab === "code" ? "active" : ""}`} onClick={() => setActiveTab("code")}>
-                      <FileCode2 size={12} /> 代码 <span className="tab-badge">{tabCounts.code}</span>
-                    </button>
-                  )}
-                  {tabCounts.image > 0 && (
-                    <button className={`tab ${activeTab === "image" ? "active" : ""}`} onClick={() => setActiveTab("image")}>
-                      <Image size={12} /> 图片 <span className="tab-badge">{tabCounts.image}</span>
-                    </button>
-                  )}
-                  {tabCounts.config > 0 && (
-                    <button className={`tab ${activeTab === "config" ? "active" : ""}`} onClick={() => setActiveTab("config")}>
-                      <Settings size={12} /> 配置 <span className="tab-badge">{tabCounts.config}</span>
-                    </button>
-                  )}
-                </div>
-                <div className="results-info">
-                  <span className="results-count">{filteredResults.length} 项</span>
-                  {selectedResults.size > 0 && <span className="results-selected">已选 {selectedResults.size}</span>}
-                </div>
-              </div>
-
-              <div className="results-actions-bar">
-                <div className="results-actions-left">
-                  <button className="action-btn" onClick={handleExpandAll} title="展开"><Maximize2 size={13} /></button>
-                  <button className="action-btn" onClick={handleCollapseAll} title="折叠"><Minimize2 size={13} /></button>
-                  <div className="action-divider" />
-                  <button className="action-btn" onClick={handleSelectAll}>全选</button>
-                  <button className="action-btn" onClick={handleDeselectAll}>取消</button>
-                </div>
-                <button className="action-btn action-btn--danger" onClick={handleDeleteSelected} disabled={selectedResults.size === 0}>
-                  <Trash2 size={13} /> 移到废纸篓
-                </button>
-              </div>
-
-              <div className="results-tree">
-                {buildTree ? renderTreeNode(buildTree) : (
-                  <div className="empty-state">
-                    <Shield size={40} className="empty-icon" />
-                    <div className="empty-title">未找到匹配文件</div>
-                    <div className="empty-subtitle">尝试调整关键字或文件类型筛选</div>
+            {isScanning && (
+              <div className="scan-progress">
+                <div className="progress-bar"><div className="progress-track" /></div>
+                <div className="progress-info">
+                  <div className="progress-stats">
+                    <span className="progress-count">已扫描 {scanProgress?.files_scanned || 0} 个文件</span>
+                    <span className="progress-found">找到 {scanProgress?.results_found || 0} 个结果</span>
                   </div>
-                )}
-              </div>
-            </>
-          )}
-
-          {!scanProgress && (
-            <div className="empty-state">
-              <div className="empty-hero">
-                <Shield size={48} />
-              </div>
-              <div className="empty-title">文件搜索与定位</div>
-              <div className="empty-subtitle">选择目录，输入关键字，快速定位文件</div>
-              <div className="empty-hints">
-                <div className="hint">
-                  <FileText size={16} />
-                  <span>支持文件名、内容、EXIF 搜索</span>
-                </div>
-                <div className="hint">
-                  <FolderOpen size={16} />
-                  <span>树形结构展示，清晰定位</span>
-                </div>
-                <div className="hint">
-                  <Trash2 size={16} />
-                  <span>一键移到废纸篓，安全删除</span>
+                  {scanProgress?.current_path && <div className="progress-path" title={scanProgress.current_path}><FolderOpen size={12} /><span>{scanProgress.current_path}</span></div>}
                 </div>
               </div>
-            </div>
-          )}
+            )}
+            {(scanProgress || isScanning) && (
+              <>
+                <div className="results-toolbar">
+                  <div className="results-tabs">
+                    <button className={`tab ${activeTab === "all" ? "active" : ""}`} onClick={() => setActiveTab("all")}>全部 <span className="tab-badge">{tabCounts.all}</span></button>
+                    {tabCounts.document > 0 && <button className={`tab ${activeTab === "document" ? "active" : ""}`} onClick={() => setActiveTab("document")}><FileText size={12} /> 文档 <span className="tab-badge">{tabCounts.document}</span></button>}
+                    {tabCounts.code > 0 && <button className={`tab ${activeTab === "code" ? "active" : ""}`} onClick={() => setActiveTab("code")}><FileCode2 size={12} /> 代码 <span className="tab-badge">{tabCounts.code}</span></button>}
+                    {tabCounts.image > 0 && <button className={`tab ${activeTab === "image" ? "active" : ""}`} onClick={() => setActiveTab("image")}><Image size={12} /> 图片 <span className="tab-badge">{tabCounts.image}</span></button>}
+                    {tabCounts.config > 0 && <button className={`tab ${activeTab === "config" ? "active" : ""}`} onClick={() => setActiveTab("config")}><Settings size={12} /> 配置 <span className="tab-badge">{tabCounts.config}</span></button>}
+                  </div>
+                  <div className="results-info">
+                    <span className="results-count">{filteredResults.length} 项</span>
+                    {selectedResults.size > 0 && <span className="results-selected">已选 {selectedResults.size}</span>}
+                  </div>
+                </div>
+                <div className="results-actions-bar">
+                  <div className="results-actions-left">
+                    <button className="action-btn" onClick={handleExpandAll} title="展开"><Maximize2 size={13} /></button>
+                    <button className="action-btn" onClick={handleCollapseAll} title="折叠"><Minimize2 size={13} /></button>
+                    <div className="action-divider" />
+                    <button className="action-btn" onClick={handleSelectAll}>全选</button>
+                    <button className="action-btn" onClick={handleDeselectAll}>取消</button>
+                  </div>
+                  <button className="action-btn action-btn--danger" onClick={handleDeleteSelected} disabled={selectedResults.size === 0}><Trash2 size={13} /> 移到废纸篓</button>
+                </div>
+                <div className="results-tree">
+                  {buildTree ? renderTreeNode(buildTree) : (
+                    <div className="empty-state">
+                      <Shield size={40} className="empty-icon" />
+                      <div className="empty-title">未找到匹配文件</div>
+                      <div className="empty-subtitle">尝试调整关键字或文件类型筛选</div>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+            {!scanProgress && (
+              <div className="empty-state">
+                <div className="empty-hero"><Shield size={48} /></div>
+                <div className="empty-title">文件搜索与定位</div>
+                <div className="empty-subtitle">选择目录，输入关键字，快速定位文件</div>
+                <div className="empty-hints">
+                  <div className="hint"><FileText size={16} /><span>支持文件名、内容、EXIF 搜索</span></div>
+                  <div className="hint"><FolderOpen size={16} /><span>树形结构展示，清晰定位</span></div>
+                  <div className="hint"><Trash2 size={16} /><span>一键移到废纸篓，安全删除</span></div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Text Preview Modal */}
       {previewFile && (
         <div className="modal-overlay" onClick={() => setPreviewFile(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <div className="modal-title">
-                <Eye size={15} />
-                <span>{previewFile.file_name}</span>
-              </div>
-              <button className="modal-close" onClick={() => setPreviewFile(null)}>
-                <X size={14} />
-              </button>
+              <div className="modal-title"><Eye size={15} /><span>{previewFile.file_name}</span></div>
+              <button className="modal-close" onClick={() => setPreviewFile(null)}><X size={14} /></button>
             </div>
             <div className="modal-body">
               {previewFile.context_lines.length > 0 ? (
@@ -763,37 +650,25 @@ function App() {
                     </div>
                   ))}
                 </div>
-              ) : (
-                <div className="empty-state" style={{ padding: "40px" }}>
-                  <div className="empty-subtitle">此文件类型不支持预览</div>
-                </div>
-              )}
+              ) : <div className="empty-state" style={{ padding: "40px" }}><div className="empty-subtitle">此文件类型不支持预览</div></div>}
             </div>
           </div>
         </div>
       )}
-
-      {/* Image Preview Modal */}
       {previewImage && (
         <div className="modal-overlay" onClick={() => setPreviewImage(null)}>
           <div className="modal modal--image" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <div className="modal-title">
-                <Image size={15} />
-                <span>图片预览</span>
-              </div>
-              <button className="modal-close" onClick={() => setPreviewImage(null)}>
-                <X size={14} />
-              </button>
+              <div className="modal-title"><Image size={15} /><span>图片预览</span></div>
+              <button className="modal-close" onClick={() => setPreviewImage(null)}><X size={14} /></button>
             </div>
-            <div className="modal-body modal-body--image">
-              <img src={previewImage} alt="Preview" className="preview-image" />
-            </div>
+            <div className="modal-body modal-body--image"><img src={previewImage} alt="Preview" className="preview-image" /></div>
           </div>
         </div>
       )}
     </div>
   );
 }
+
 
 export default App;
