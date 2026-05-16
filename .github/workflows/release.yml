@@ -49,7 +49,7 @@ jobs:
           - platform: windows-latest
             target: x86_64-pc-windows-msvc
             rust_target: x86_64-pc-windows-msvc
-            bundle: msi,exe
+            bundle: msi,nsis
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -103,11 +103,3 @@ jobs:
         with:
           releaseId: ${{ needs.create-release.outputs.release_id }}
           args: --target ${{ matrix.rust_target }} --bundles ${{ matrix.bundle }}
-
-      - name: Upload release assets
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            src-tauri/target/${{ matrix.rust_target }}/release/bundle/**/*
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
