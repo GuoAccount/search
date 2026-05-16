@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "gh-cli": {
+      "name": "gh-cli",
+      "zip_url": "https://lightmake.site/api/v1/download?slug=gh-cli",
+      "source": "skillhub",
+      "version": "1.1.2"
+    }
+  }
+}
