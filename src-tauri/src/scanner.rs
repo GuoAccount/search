@@ -546,7 +546,7 @@ fn extract_exif(path: &Path) -> Result<String, String> {
 fn perform_ocr(path: &Path) -> Result<Vec<OCRRegion>, String> {
     let script = include_str!("../resources/ocr.swift");
     let temp_dir = std::env::temp_dir();
-    let temp_script = temp_dir.join("filescope_ocr.swift");
+    let temp_script = temp_dir.join("lumina_ocr.swift");
     fs::write(&temp_script, script).map_err(|e| e.to_string())?;
     let output = Command::new("swift")
         .arg(&temp_script)

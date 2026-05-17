@@ -2078,6 +2078,29 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5e5032e24019045c762d3c0f28f5b6b8bbf38563a65908389bf7978758920897"
 
 [[package]]
+name = "lumina"
+version = "2.2.0"
+dependencies = [
+ "base64 0.22.1",
+ "chrono",
+ "glob",
+ "image",
+ "kamadak-exif",
+ "rayon",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-dialog",
+ "tauri-plugin-notification",
+ "tauri-plugin-opener",
+ "tokio",
+ "trash",
+ "uuid",
+ "walkdir",
+]
+
+[[package]]
 name = "mac-notification-sys"
 version = "0.6.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3124,29 +3147,6 @@ name = "scopeguard"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
-
-[[package]]
-name = "search"
-version = "2.1.0"
-dependencies = [
- "base64 0.22.1",
- "chrono",
- "glob",
- "image",
- "kamadak-exif",
- "rayon",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-dialog",
- "tauri-plugin-notification",
- "tauri-plugin-opener",
- "tokio",
- "trash",
- "uuid",
- "walkdir",
-]
 
 [[package]]
 name = "selectors"

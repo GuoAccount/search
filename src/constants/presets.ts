@@ -1,7 +1,7 @@
 import { FileText, FileCode2, Image, Settings } from "lucide-react";
 import { FileTypePreset } from "../types";
 
-export const STORAGE_KEY = "filescope_settings";
+export const STORAGE_KEY = "lumina_settings";
 
 export const DEFAULT_PRESETS: Record<string, FileTypePreset> = {
   document: {

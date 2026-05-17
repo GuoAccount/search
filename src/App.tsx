@@ -91,7 +91,7 @@ function App() {
 
       // Send system notification
       const doNotify = () => {
-        sendNotification({ title: "FileScope - 待确认", body: `收到 ${newCount} 个待确认事项` });
+        sendNotification({ title: "Lumina - 待确认", body: `收到 ${newCount} 个待确认事项` });
         invoke("play_system_sound").catch(() => {});
       };
 
@@ -105,7 +105,7 @@ function App() {
           notifyTimer.current = window.setTimeout(() => {
             const count = pendingNotifyCount.current;
             if (count > 0) {
-              sendNotification({ title: "FileScope - 待确认", body: `收到 ${count + 1} 个待确认事项` });
+              sendNotification({ title: "Lumina - 待确认", body: `收到 ${count + 1} 个待确认事项` });
               invoke("play_system_sound").catch(() => {});
             }
             pendingNotifyCount.current = 0;
