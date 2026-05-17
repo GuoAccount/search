@@ -1,0 +1,77 @@
+.container {
+  margin-bottom: var(--space-3);
+}
+
+.bar {
+  height: 3px;
+  background: var(--color-fill-secondary);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: var(--space-2);
+}
+
+.track {
+  height: 100%;
+  width: 30%;
+  background: var(--color-blue);
+  border-radius: 2px;
+  animation: progress 1.5s ease-in-out infinite;
+}
+
+@keyframes progress {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+
+.info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.stats {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: 11px;
+  color: var(--color-secondary-label);
+}
+
+.count {
+  font-variant-numeric: tabular-nums;
+}
+
+.found {
+  color: var(--color-blue);
+  font-weight: 500;
+}
+
+.skipped {
+  color: var(--color-orange, #ff9800);
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+}
+
+.skipped:hover {
+  color: var(--color-orange-hover, #f57c00);
+}
+
+.path {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--color-tertiary-label);
+  overflow: hidden;
+}
+
+.path span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
