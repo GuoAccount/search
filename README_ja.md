@@ -5,7 +5,8 @@
 <h1 align="center">Lumina</h1>
 
 <p align="center">
-  <em>ファイルを照らす</em>
+  <em>ファイルを照らす</em><br>
+  <code>OCR</code> <code>全文検索</code> <code>EXIF</code> <code>Tauri</code> <code>macOS</code>
 </p>
 
 <p align="center">

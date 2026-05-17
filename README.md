@@ -5,7 +5,8 @@
 <h1 align="center">Lumina</h1>
 
 <p align="center">
-  <em>Illuminate your files</em>
+  <em>Illuminate your files</em><br>
+  <code>OCR</code> <code>全文搜索</code> <code>EXIF</code> <code>Tauri</code> <code>macOS</code>
 </p>
 
 <p align="center">
