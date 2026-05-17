@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1a1a2e"/>
+      <stop offset="50%" stop-color="#16213e"/>
+      <stop offset="100%" stop-color="#0f3460"/>
+    </linearGradient>
+    <radialGradient id="bgGlow" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#2d2d5e" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#1a1a2e" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="file" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#E8ECF0"/>
+    </linearGradient>
+    <linearGradient id="fileBack" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#D1D5DB"/>
+      <stop offset="100%" stop-color="#9CA3AF"/>
+    </linearGradient>
+    <linearGradient id="lens" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#60A5FA"/>
+      <stop offset="100%" stop-color="#3B82F6"/>
+    </linearGradient>
+    <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#E5E7EB"/>
+      <stop offset="100%" stop-color="#9CA3AF"/>
+    </linearGradient>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="8" stdDeviation="16" flood-opacity="0.4"/>
+    </filter>
+    <filter id="iconShadow">
+      <feDropShadow dx="0" dy="12" stdDeviation="24" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+  
+  <!-- Background with padding (smaller than viewBox) -->
+  <rect x="64" y="64" width="896" height="896" rx="200" fill="url(#bg)"/>
+  <rect x="64" y="64" width="896" height="896" rx="200" fill="url(#bgGlow)"/>
+  
+  <!-- Icon group with shadow -->
+  <g filter="url(#iconShadow)">
+    <!-- Back file -->
+    <g transform="translate(310, 240)">
+      <rect x="0" y="0" width="380" height="500" rx="20" fill="url(#fileBack)"/>
+    </g>
+    
+    <!-- Front file -->
+    <g transform="translate(270, 200)">
+      <rect x="0" y="0" width="380" height="500" rx="20" fill="url(#file)"/>
+      <rect x="50" y="120" width="200" height="12" rx="6" fill="#CBD5E1"/>
+      <rect x="50" y="165" width="160" height="12" rx="6" fill="#CBD5E1"/>
+      <rect x="50" y="210" width="180" height="12" rx="6" fill="#CBD5E1"/>
+      <rect x="50" y="255" width="130" height="12" rx="6" fill="#CBD5E1"/>
+      <rect x="50" y="300" width="150" height="12" rx="6" fill="#CBD5E1"/>
+    </g>
+    
+    <!-- Magnifying glass -->
+    <g transform="translate(620, 580)">
+      <line x1="80" y1="80" x2="150" y2="150" stroke="url(#ring)" stroke-width="24" stroke-linecap="round"/>
+      <circle cx="0" cy="0" r="105" fill="url(#ring)"/>
+      <circle cx="0" cy="0" r="92" fill="#1a1a2e"/>
+      <circle cx="0" cy="0" r="76" fill="url(#lens)"/>
+      <ellipse cx="-18" cy="-18" rx="28" ry="20" fill="white" opacity="0.2" transform="rotate(-30)"/>
+    </g>
+  </g>
+</svg>
