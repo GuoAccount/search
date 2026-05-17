@@ -4,7 +4,8 @@ import { Image, X } from "lucide-react";
 import styles from "./ImagePreviewModal.module.css";
 
 export function ImagePreviewModal() {
-  const { previewImage, setPreviewImage } = useStore();
+  const { previewImage, setPreviewImage, appConfig } = useStore();
+  const showBboxes = appConfig?.display?.ocr_highlight_enabled ?? true;
   const imgRef = useRef<HTMLImageElement>(null);
   const [naturalSize, setNaturalSize] = useState({ w: 1, h: 1 });
 
@@ -48,7 +49,7 @@ export function ImagePreviewModal() {
                 setNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
               }}
             />
-            {bboxes.length > 0 && (
+            {showBboxes && bboxes.length > 0 && (
               <svg
                 className={styles.bboxOverlay}
                 viewBox={`0 0 ${naturalSize.w} ${naturalSize.h}`}

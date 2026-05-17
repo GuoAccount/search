@@ -7,6 +7,8 @@ use tauri::Manager;
 pub struct AppConfig {
     pub version: u32,
     pub scan: ScanSettings,
+    #[serde(default)]
+    pub display: DisplaySettings,
     pub skip_rules: Vec<String>,
     pub scan_rules: Vec<String>,
 }
@@ -17,6 +19,21 @@ pub struct ScanSettings {
     pub ask_on_large_dir: bool,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DisplaySettings {
+    pub default_expand_count: u32,
+    pub ocr_highlight_enabled: bool,
+}
+
+impl Default for DisplaySettings {
+    fn default() -> Self {
+        DisplaySettings {
+            default_expand_count: 1,
+            ocr_highlight_enabled: true,
+        }
+    }
+}
+
 impl Default for AppConfig {
     fn default() -> Self {
         AppConfig {
@@ -24,6 +41,10 @@ impl Default for AppConfig {
             scan: ScanSettings {
                 large_dir_threshold: 1000,
                 ask_on_large_dir: true,
+            },
+            display: DisplaySettings {
+                default_expand_count: 1,
+                ocr_highlight_enabled: true,
             },
             skip_rules: vec![
                 "node_modules".into(),

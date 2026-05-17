@@ -62,6 +62,7 @@ pub fn run() {
             commands::file_ops::reveal_in_finder,
             commands::file_ops::get_file_info,
             commands::system::play_system_sound,
+            commands::system::open_config_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

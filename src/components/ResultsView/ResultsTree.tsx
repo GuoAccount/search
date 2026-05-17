@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { useStore } from "../../store";
 import { buildTree, getFileDir } from "../../utils/file";
 import { getFileCategory } from "../../utils/file";
@@ -14,6 +15,15 @@ import {
 } from "lucide-react";
 import styles from "./ResultsTree.module.css";
 
+function getParentDirs(filePath: string): string[] {
+  const dirs: string[] = [];
+  const parts = filePath.split("/").filter(Boolean);
+  for (let i = 1; i < parts.length; i++) {
+    dirs.push("/" + parts.slice(0, i).join("/"));
+  }
+  return dirs;
+}
+
 export function ResultsTree() {
   const {
     scanProgress,
@@ -24,7 +34,36 @@ export function ResultsTree() {
     setSelectedResults,
     setPreviewFile,
     setPreviewImage,
+    appConfig,
   } = useStore();
+
+  const lastAutoExpandLen = useRef(0);
+
+  useEffect(() => {
+    if (!scanProgress || activeTab !== "all") return;
+    if (scanProgress.results.length <= lastAutoExpandLen.current) return;
+    lastAutoExpandLen.current = scanProgress.results.length;
+
+    const expandCount = appConfig?.display?.default_expand_count ?? 1;
+    if (expandCount === 0) return;
+
+    const toExpand = new Set(expandedFolders);
+    const seen = new Set<string>();
+    let added = 0;
+
+    for (const result of scanProgress.results) {
+      if (added >= expandCount) break;
+      if (seen.has(result.file_path)) continue;
+      seen.add(result.file_path);
+      const dirs = getParentDirs(result.file_path);
+      for (const dir of dirs) {
+        toExpand.add(dir);
+      }
+      added++;
+    }
+
+    setExpandedFolders(toExpand);
+  }, [scanProgress?.results.length, activeTab, appConfig?.display?.default_expand_count]);
 
   if (!scanProgress) return null;
 

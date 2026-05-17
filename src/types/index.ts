@@ -98,9 +98,14 @@ export interface TreeNode {
 }
 
 export interface AppConfig {
+  version: number;
   scan: {
     large_dir_threshold: number;
     ask_on_large_dir: boolean;
+  };
+  display: {
+    default_expand_count: number;
+    ocr_highlight_enabled: boolean;
   };
   skip_rules: string[];
   scan_rules: string[];

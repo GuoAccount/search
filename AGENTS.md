@@ -24,6 +24,7 @@
 - `docs/RELIABILITY.md`：运行信号、benchmark、重启要求
 - `docs/SECURITY.md`：密钥、沙箱、数据和外部动作规则
 - `docs/FRONTEND.md`：UI 约束、设计系统规则、可访问性检查
+- `docs/references/modular-rules.md`：模块化开发规则（前端 + 后端 + 通用）
 
 ## 工作约定
 

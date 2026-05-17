@@ -3,7 +3,35 @@ pub fn play_system_sound() -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
         std::process::Command::new("afplay")
-            .arg("/System/Library/Sounds/Ping.aiff")
+            .args(["/System/Library/Sounds/Pop.aiff"])
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn open_config_file(app_handle: tauri::AppHandle) -> Result<(), String> {
+    use crate::config::AppConfig;
+    let path = AppConfig::config_path(&app_handle);
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .args(["-R", &path.to_string_lossy()])
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer")
+            .args(["/select,", &path.to_string_lossy()])
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(path.parent().unwrap_or(&path).to_string_lossy().to_string())
             .spawn()
             .map_err(|e| e.to_string())?;
     }
