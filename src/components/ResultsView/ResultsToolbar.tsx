@@ -37,8 +37,14 @@ export function ResultsToolbar() {
   };
 
   const handleExpandAll = () => {
-    const allPaths = new Set(scanProgress.results.map((r) => r.file_path));
-    setExpandedFolders(allPaths);
+    const folderPaths = new Set<string>();
+    for (const result of scanProgress.results) {
+      const parts = result.file_path.split("/").filter(Boolean);
+      for (let i = 1; i < parts.length; i++) {
+        folderPaths.add("/" + parts.slice(0, i).join("/"));
+      }
+    }
+    setExpandedFolders(folderPaths);
   };
 
   const handleCollapseAll = () => {

@@ -32,7 +32,8 @@ export function ResultsTree() {
     return getFileCategory(result.file_extension) === activeTab;
   });
 
-  const tree = buildTree(filteredResults);
+  const isFlatMode = activeTab !== "all";
+  const tree = isFlatMode ? null : buildTree(filteredResults);
 
   const handleToggleFolder = (path: string) => {
     setExpandedFolders((prev) => {
@@ -167,7 +168,65 @@ export function ResultsTree() {
     );
   };
 
-  if (tree.children.length === 0) {
+  if (isFlatMode) {
+    if (filteredResults.length === 0) {
+      return (
+        <div className={styles.empty}>
+          <div className={styles.emptyTitle}>未找到匹配文件</div>
+          <div className={styles.emptySubtitle}>
+            尝试调整关键字或文件类型筛选
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className={styles.container}>
+        {filteredResults.map((result) => {
+          const isSelected = selectedResults.has(result.file_path);
+          return (
+            <div
+              key={result.file_path}
+              className={`${styles.item} ${isSelected ? styles.selected : ""}`}
+              style={{ paddingLeft: "8px" }}
+              onClick={() => handleToggleSelect(result.file_path)}
+              onDoubleClick={() => handlePreviewFile(result)}
+            >
+              <div className={styles.icon}>
+                {getFileIcon(result.file_extension, false)}
+              </div>
+              <span className={styles.name}>{result.file_name}</span>
+              <span className={styles.matchType}>
+                {result.match_type === "filename"
+                  ? "文件名"
+                  : result.match_type === "content"
+                  ? "内容"
+                  : result.match_type === "exif"
+                  ? "EXIF"
+                  : "OCR"}
+              </span>
+              {result.match_context && (
+                <span className={styles.context}>
+                  {result.match_context.substring(0, 50)}
+                </span>
+              )}
+              <button
+                className={styles.preview}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handlePreviewFile(result);
+                }}
+              >
+                <Eye size={12} />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  if (tree!.children.length === 0) {
     return (
       <div className={styles.empty}>
         <div className={styles.emptyTitle}>未找到匹配文件</div>
@@ -180,7 +239,7 @@ export function ResultsTree() {
 
   return (
     <div className={styles.container}>
-      {tree.children.map((child) => renderNode(child))}
+      {tree!.children.map((child) => renderNode(child))}
     </div>
   );
 }

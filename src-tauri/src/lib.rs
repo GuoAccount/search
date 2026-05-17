@@ -6,7 +6,7 @@ pub mod types;
 pub mod commands;
 mod scanner;
 
-use types::{ScanStore, PauseStore, CancelStore};
+use types::{ScanStore, PauseStore, CancelStore, ChannelStore};
 
 #[tauri::command]
 fn select_directory() -> Result<String, String> {
@@ -35,6 +35,7 @@ pub fn run() {
     let scan_store: ScanStore = Arc::new(Mutex::new(HashMap::new()));
     let pause_store = PauseStore(Arc::new(Mutex::new(HashMap::new())));
     let cancel_store = CancelStore(Arc::new(Mutex::new(HashMap::new())));
+    let channel_store: ChannelStore = Arc::new(Mutex::new(HashMap::new()));
     
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
@@ -43,13 +44,13 @@ pub fn run() {
         .manage(scan_store)
         .manage(pause_store)
         .manage(cancel_store)
+        .manage(channel_store)
         .invoke_handler(tauri::generate_handler![
             select_directory,
             get_config,
             save_config,
             reset_config,
             commands::scan::start_scan,
-            commands::scan::scan_sub_directory,
             commands::scan::get_scan_progress,
             commands::scan::cancel_scan,
             commands::scan::pause_scan,

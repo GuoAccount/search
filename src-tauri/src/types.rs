@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use std::sync::mpsc::Sender;
 
 use crate::scanner::ScanResult;
 
@@ -64,3 +66,9 @@ pub struct PauseStore(pub Arc<Mutex<HashMap<String, Arc<Mutex<bool>>>>>);
 
 #[derive(Clone)]
 pub struct CancelStore(pub Arc<Mutex<HashMap<String, Arc<Mutex<bool>>>>>);
+
+pub struct DirWork {
+    pub path: PathBuf,
+}
+
+pub type ChannelStore = Arc<Mutex<HashMap<String, Sender<DirWork>>>>;

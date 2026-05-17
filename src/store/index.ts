@@ -196,7 +196,7 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   respondConfirmation: async (confirmationId: string, allow: boolean, remember: boolean) => {
-    const { scanProgress, settings } = get();
+    const { scanProgress } = get();
     if (!scanProgress) return;
 
     const confirmation = scanProgress.pending_confirmations.find(
@@ -233,65 +233,9 @@ export const useStore = create<AppState>((set, get) => ({
         };
       });
 
-      // If allowed, start sub-scan
-      if (allow && confirmation) {
-        const extensions = getAllExtensions(settings.enabledPresets, settings.customExtensions);
-        const scanTypes = ["file_name", "text_content"];
-        if (settings.enabledPresets.includes("image")) {
-          scanTypes.push("exif_data");
-          if (settings.ocrEnabled) scanTypes.push("ocr_text");
-        }
-
-        const subScanId = await invoke<string>("scan_sub_directory", {
-          scanId: scanProgress.scan_id,
-          directoryPath: confirmation.path,
-          config: {
-            path: confirmation.path,
-            keyword: settings.keyword,
-            scan_types: scanTypes,
-            file_extensions: extensions,
-            exclude_patterns: [],
-          },
-        });
-
-        // Poll sub-scan results
-        const subInterval = window.setInterval(async () => {
-          try {
-            const subProgress = await invoke<ScanProgress>("get_scan_progress", {
-              scanId: subScanId,
-            });
-
-            if (subProgress.results.length > 0) {
-              set((state) => {
-                if (!state.scanProgress) return state;
-                const existingPaths = new Set(
-                  state.scanProgress.results.map((r) => r.file_path)
-                );
-                const newResults = subProgress.results.filter(
-                  (r) => !existingPaths.has(r.file_path)
-                );
-                return {
-                  scanProgress: {
-                    ...state.scanProgress,
-                    results: [...state.scanProgress.results, ...newResults],
-                    results_found:
-                      state.scanProgress.results_found + newResults.length,
-                  },
-                };
-              });
-            }
-
-            if (
-              subProgress.status === "completed" ||
-              subProgress.status === "cancelled"
-            ) {
-              window.clearInterval(subInterval);
-            }
-          } catch (err) {
-            console.error("Failed to get sub-scan progress:", err);
-          }
-        }, 200);
-      }
+      // No sub-scan needed! Results flow through the main scan's work channel.
+      // The backend's respond_confirmation sends the directory to search workers
+      // via work_tx, and results appear in the main scan's progress automatically.
 
       // Refresh config if remember was checked
       if (remember) {

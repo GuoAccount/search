@@ -29,7 +29,8 @@
 │                    Backend (Rust)                         │
 │  ┌─────────────────────────────────────────────────────┐ │
 │  │              lib.rs (Tauri 构建入口)                  │ │
-│  │  .manage(ScanStore, PauseStore, CancelStore)         │ │
+│  │  .manage(ScanStore, PauseStore, CancelStore,         │ │
+│  │         ChannelStore)                                │ │
 │  └─────────────────────────────────────────────────────┘ │
 │  ┌─────────────────────────────────────────────────────┐ │
 │  │              commands/ (Tauri 命令层)                 │ │
@@ -37,7 +38,7 @@
 │  └─────────────────────────────────────────────────────┘ │
 │  ┌─────────────────────────────────────────────────────┐ │
 │  │              scanner.rs (扫描引擎)                    │ │
-│  │  BFS 遍历 → Rayon 并行处理 → 回调通知                 │ │
+│  │  BFS 线程 → work_tx → Rayon 线程池 → 结果实时返回    │ │
 │  └─────────────────────────────────────────────────────┘ │
 │  ┌──────────────┐  ┌───────────────────────────────────┐ │
 │  │  config.rs   │  │  types.rs (共享数据结构)            │ │
@@ -68,6 +69,7 @@ Types → Config → Scanner → Commands → Store → UI
 - Scanner 只依赖 Types，不依赖 Commands
 - Types 无依赖，纯数据定义
 - **禁止：** UI 层直接调用 Tauri 命令
+- **禁止：** 对每个工作项 `std::thread::spawn`（会导致线程爆炸，系统崩溃）。必须使用线程池（rayon）或固定数量的工作线程
 
 ## 核心数据流
 
@@ -75,28 +77,29 @@ Types → Config → Scanner → Commands → Store → UI
 
 ```
 用户点击搜索 → store.startScan() → invoke("start_scan")
-→ scanner::scan_directory_with_callback()
-  → collect_entries_bfs()    // 收集文件
-  → rayon::par_chunks()      // 并行匹配
-  → callback.on_result()     // 写入 ScanStore
-→ 前端轮询 get_scan_progress → 更新 UI
+→ 创建 work_tx/work_rx 通道，存入 ChannelStore
+→ scanner::scan_directory()
+  → BFS 线程：遍历目录树
+    ≤ 阈值目录 → work_tx → 搜索工作协程 → 匹配文件 → 结果实时写入 ScanStore
+    > 阈值目录 → 前端确认面板 → 用户允许 → work_tx 重新注入
+  → 前端轮询 get_scan_progress → 实时更新 UI
 ```
 
 ### 大目录确认流程
 
 ```
-BFS 遇到大目录 → should_process_entry() 返回 false
-→ callback.on_confirmation_needed()
+BFS 遇到大目录 → count_entries_fast() > threshold
+→ on_confirmation_needed() → 写入 ScanStore.pending_confirmations
 → 前端轮询检测 → 系统通知 + 自动弹出确认面板
-→ 用户点击"允许" → scan_sub_directory() → 结果合并
+→ 用户点击"允许" → respond_confirmation → work_tx.send(DirWork)
+→ 搜索工作协程自动处理 → 结果实时展示
 ```
 
 详细流程图见 `docs/scan-flow.md`
 
 ## 当前热点
 
-- **BUG-001：扫描不产出结果** — 见 `docs/QUALITY.md`
-- 模块化重构已完成，待验证功能完整性
+- 搜索逻辑已重构为 BFS + 搜索工作协程并发架构
 
 ## 变更检查
 

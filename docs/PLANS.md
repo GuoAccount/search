@@ -13,23 +13,16 @@
 
 ## 当前热点任务
 
-### 🔴 P0: 扫描不产出结果 [进行中]
+### 🔴 P0: 搜索逻辑重构 [已完成]
 
-**问题：** 扫描运行后只触发大目录确认事件，不产出任何搜索结果。
+将扫描引擎从"先收集后处理"改为"BFS 与搜索工作协程并发"架构。
 
-**症状：**
-- 点击搜索后，"待确认"按钮出现
-- 确认面板弹出，显示大目录
-- 但扫描结果始终为 0
-- 即使允许扫描大目录，结果仍为 0
-
-**排查方向：**
-- [ ] `collect_entries_bfs` 返回的 entries 数量
-- [ ] `should_process_entry` 是否错误跳过文件
-- [ ] `on_result` 回调是否被调用
-- [ ] `get_scan_progress` 返回的 results 数据
-
-详见 `docs/QUALITY.md` BUG-001
+**已完成：**
+- [x] 重构 scanner.rs：BFS 线程 + 搜索工作协程
+- [x] 重构 commands/scan.rs：通道管理，消除 scan_sub_directory
+- [x] 新增 DirWork + ChannelStore 类型
+- [x] 简化 store/index.ts：移除子扫描轮询和结果合并逻辑（约 80 行）
+- [x] cargo check + npm run build 编译通过
 
 ---
 
