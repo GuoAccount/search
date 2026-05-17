@@ -30,6 +30,7 @@ interface AppState {
   showConfirmPanel: boolean;
   showSkippedPanel: boolean;
   showSettings: boolean;
+  isFullscreen: boolean;
 
   // Config
   appConfig: AppConfig | null;
@@ -46,6 +47,7 @@ interface AppState {
 
   // UI actions
   setIsScanning: (isScanning: boolean) => void;
+  setIsFullscreen: (isFullscreen: boolean) => void;
   setScanProgress: (progress: ScanProgress | null | ((prev: ScanProgress | null) => ScanProgress | null)) => void;
   setSelectedResults: (results: Set<string> | ((prev: Set<string>) => Set<string>)) => void;
   setPreviewFile: (file: FilePreview | null) => void;
@@ -88,6 +90,7 @@ export const useStore = create<AppState>((set, get) => ({
   showConfirmPanel: false,
   showSkippedPanel: false,
   showSettings: false,
+  isFullscreen: false,
 
   // Config
   appConfig: null,
@@ -258,6 +261,7 @@ export const useStore = create<AppState>((set, get) => ({
 
   // UI actions
   setIsScanning: (isScanning) => set({ isScanning }),
+  setIsFullscreen: (isFullscreen) => set({ isFullscreen }),
   setScanProgress: (progress) =>
     set((state) => ({
       scanProgress:

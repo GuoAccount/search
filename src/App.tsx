@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { sendNotification } from "@tauri-apps/plugin-notification";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useStore } from "./store";
 import { Sidebar } from "./components/Sidebar/Sidebar";
 import { SearchBar } from "./components/SearchBar/SearchBar";
@@ -26,6 +27,8 @@ function App() {
     scanProgress,
     setShowConfirmPanel,
     showConfirmPanel,
+    isFullscreen,
+    setIsFullscreen,
   } = useStore();
 
   const isOpen = settings.sidebarOpen;
@@ -43,6 +46,30 @@ function App() {
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", settings.theme);
   }, [settings.theme]);
+
+  // Fullscreen detection
+  useEffect(() => {
+    const appWindow = getCurrentWindow();
+    
+    const checkFullscreen = async () => {
+      try {
+        const fullscreen = await appWindow.isFullscreen();
+        setIsFullscreen(fullscreen);
+      } catch (err) {
+        console.error("Failed to check fullscreen:", err);
+      }
+    };
+
+    checkFullscreen();
+
+    const unlisten = appWindow.onResized(() => {
+      checkFullscreen();
+    });
+
+    return () => {
+      unlisten.then(fn => fn());
+    };
+  }, []);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -116,7 +143,7 @@ function App() {
   return (
     <div className="app-container">
       <button
-        className="fixed-toggle"
+        className={`fixed-toggle ${isFullscreen ? "fullscreen" : ""}`}
         onClick={() => updateSettings({ sidebarOpen: !settings.sidebarOpen })}
       >
         {isOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
@@ -125,7 +152,7 @@ function App() {
         <Sidebar />
         <div className="content-col">
           <div className="content-header" data-tauri-drag-region="deep">
-            <div className="content-header-left">
+            <div className={`content-header-left ${!isOpen ? (isFullscreen ? "sidebar-closed-fullscreen" : "sidebar-closed") : ""}`}>
               {settings.scanPath && (
                 <div className="header-path">
                   <FolderOpen size={12} />
