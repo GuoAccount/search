@@ -96,7 +96,7 @@ pub async fn start_scan(
 
         crate::scanner::scan_directory(config, app_config, callback, work_tx, work_rx);
 
-        // Cleanup: remove channel from store
+        // Cleanup: remove channel from store (this drops the last work_tx clone)
         channel_store.lock().unwrap().remove(&sid);
 
         let mut store_guard = store.lock().unwrap();

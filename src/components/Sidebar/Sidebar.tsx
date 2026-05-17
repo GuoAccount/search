@@ -1,5 +1,6 @@
 import { useStore } from "../../store";
 import { PresetSelector } from "../PresetSelector/PresetSelector";
+import { DEFAULT_PRESETS } from "../../constants/presets";
 import { Sun, Moon, Monitor, Settings } from "lucide-react";
 import styles from "./Sidebar.module.css";
 
@@ -16,7 +17,7 @@ export function Sidebar() {
   const isOpen = settings.sidebarOpen;
   const selectedCount = settings.enabledPresets.length;
   const extCount = settings.enabledPresets.reduce((acc, preset) => {
-    const defaultExts = 0; // TODO: Get from constants
+    const defaultExts = DEFAULT_PRESETS[preset]?.extensions.length || 0;
     const custom = settings.customExtensions[preset] || [];
     return acc + defaultExts + custom.length;
   }, 0);

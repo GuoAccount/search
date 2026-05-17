@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{self, Sender, Receiver};
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicU32, AtomicBool, Ordering};
 use std::time::Duration;
 use uuid::Uuid;
 use exif::Reader;
@@ -106,53 +106,67 @@ pub fn scan_directory(
     });
 
     // 4. Dispatcher: reads work channel, dispatches to rayon thread pool
-    let (done_tx, done_rx) = mpsc::channel::<()>();
-    let done_tx = Arc::new(Mutex::new(done_tx));
-
     let rtx_main = result_tx.clone();
     let ptx_main = progress_tx.clone();
 
-    let dispatch_done_tx = done_tx.clone();
+    let active_count = Arc::new(AtomicU32::new(0));
+    let active_count_clone = active_count.clone();
+    let bfs_done = Arc::new(AtomicBool::new(false));
+    let bfs_done_clone = bfs_done.clone();
+
     let dispatch_handle = std::thread::spawn(move || {
-        let active_count = Arc::new(AtomicU32::new(0));
+        loop {
+            // Try to receive work with a timeout
+            match work_rx.recv_timeout(Duration::from_millis(100)) {
+                Ok(work) => {
+                    if *cancel_flag.lock().unwrap() {
+                        break;
+                    }
 
-        for work in work_rx {
-            if *cancel_flag.lock().unwrap() {
-                break;
-            }
+                    let ctx = ctx.clone();
+                    let rtx = rtx_main.clone();
+                    let ptx = ptx_main.clone();
+                    let fs = files_scanned.clone();
+                    let cf = cancel_flag.clone();
+                    let pf = pause_flag.clone();
+                    let active = active_count_clone.clone();
 
-            let ctx = ctx.clone();
-            let rtx = rtx_main.clone();
-            let ptx = ptx_main.clone();
-            let fs = files_scanned.clone();
-            let cf = cancel_flag.clone();
-            let pf = pause_flag.clone();
-            let active = active_count.clone();
-            let done = done_tx.clone();
+                    active.fetch_add(1, Ordering::SeqCst);
 
-            active.fetch_add(1, Ordering::Relaxed);
-
-            rayon::spawn(move || {
-                search_directory(&work.path, &ctx, &rtx, &ptx, &fs, &cf, &pf);
-                let prev = active.fetch_sub(1, Ordering::Relaxed);
-                if prev == 1 {
-                    let _ = done.lock().unwrap().send(());
+                    rayon::spawn(move || {
+                        search_directory(&work.path, &ctx, &rtx, &ptx, &fs, &cf, &pf);
+                        active.fetch_sub(1, Ordering::SeqCst);
+                    });
                 }
-            });
-        }
-
-        if active_count.load(Ordering::Relaxed) == 0 {
-            let _ = dispatch_done_tx.lock().unwrap().send(());
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                    // If BFS is done and no active tasks, we can stop
+                    if bfs_done_clone.load(Ordering::SeqCst) && active_count_clone.load(Ordering::SeqCst) == 0 {
+                        break;
+                    }
+                }
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                    // Channel closed, but wait for active tasks to finish
+                    while active_count_clone.load(Ordering::SeqCst) > 0 {
+                        std::thread::sleep(Duration::from_millis(10));
+                    }
+                    break;
+                }
+            }
         }
     });
 
     // Wait for BFS to finish
     let _ = bfs_handle.join();
-    drop(work_tx);
+    bfs_done.store(true, Ordering::SeqCst);
     let _ = dispatch_handle.join();
 
+    // Give rayon tasks a moment to start
+    std::thread::sleep(Duration::from_millis(50));
+
     // Wait for all rayon tasks to complete
-    let _ = done_rx.recv();
+    while active_count.load(Ordering::SeqCst) > 0 {
+        std::thread::sleep(Duration::from_millis(10));
+    }
 
     // 5. Cleanup result/progress handlers
     drop(result_tx);
@@ -174,6 +188,11 @@ fn bfs_scan(
 ) {
     let mut queue = VecDeque::new();
     queue.push_back(root.to_path_buf());
+
+    // Track which directories have been sent to work_tx to avoid duplicates
+    let mut sent_dirs: std::collections::HashSet<PathBuf> = std::collections::HashSet::new();
+    sent_dirs.insert(root.to_path_buf());
+    let _ = work_tx.send(DirWork { path: root.to_path_buf() });
 
     while let Some(dir) = queue.pop_front() {
         if *cancel_flag.lock().unwrap() {
@@ -205,7 +224,7 @@ fn bfs_scan(
             // scan_rules: force scan (highest priority)
             if matches_rules(&path, &ctx.scan_rules) {
                 if path.is_dir() {
-                    enqueue_dir(&path, &ctx, &work_tx, on_confirmation_needed, on_dir_skipped, cancel_flag, pause_flag, &mut queue);
+                    enqueue_dir(&path, &ctx, &work_tx, on_confirmation_needed, on_dir_skipped, cancel_flag, pause_flag, &mut queue, &mut sent_dirs);
                 }
                 // Files under scan_rules dirs will be handled when BFS sends the dir
                 continue;
@@ -224,7 +243,7 @@ fn bfs_scan(
 
             // Directories: classify by threshold
             if path.is_dir() {
-                enqueue_dir(&path, &ctx, &work_tx, on_confirmation_needed, on_dir_skipped, cancel_flag, pause_flag, &mut queue);
+                enqueue_dir(&path, &ctx, &work_tx, on_confirmation_needed, on_dir_skipped, cancel_flag, pause_flag, &mut queue, &mut sent_dirs);
             }
             // Files: skip (they'll be processed when their parent dir is sent to work_tx)
         }
@@ -241,7 +260,13 @@ fn enqueue_dir(
     cancel_flag: &Arc<Mutex<bool>>,
     pause_flag: &Arc<Mutex<bool>>,
     queue: &mut VecDeque<PathBuf>,
+    sent_dirs: &mut std::collections::HashSet<PathBuf>,
 ) {
+    // Skip if already sent to work queue
+    if sent_dirs.contains(path) {
+        return;
+    }
+
     let count = count_entries_fast(path);
 
     if count > ctx.threshold && ctx.ask_on_large_dir {
@@ -257,6 +282,7 @@ fn enqueue_dir(
         });
     } else {
         // Under threshold or not asking: send work item and continue BFS
+        sent_dirs.insert(path.to_path_buf());
         let _ = work_tx.send(DirWork { path: path.to_path_buf() });
         queue.push_back(path.to_path_buf());
     }
@@ -331,29 +357,51 @@ fn search_directory(
         let count = files_scanned.fetch_add(1, Ordering::Relaxed) + 1;
         let _ = progress_tx.send((count, dir_str.clone()));
 
-        // File name matching (always runs, regardless of extension filter)
-        if ctx.scan_types.contains(&"file_name".to_string()) {
-            if file_name.to_lowercase().contains(&ctx.keyword) {
-                let _ = result_tx.send(ScanResult {
-                    file_path: path.to_string_lossy().to_string(),
-                    file_name: file_name.clone(),
-                    match_type: "filename".to_string(),
-                    match_line: None,
-                    match_context: Some(file_name.clone()),
-                    file_size: metadata.len(),
-                    file_extension: extension.clone(),
-                    is_dir: false,
-                });
+        // Try matching in priority order: OCR > EXIF > Content > Filename
+        // Stop at first match to avoid duplicate results for the same file
+        let mut matched = false;
+
+        // 1. OCR text matching (highest priority for images)
+        #[cfg(target_os = "macos")]
+        if !matched && ctx.scan_types.contains(&"ocr_text".to_string()) && is_image_file(&extension) {
+            if let Ok(ocr_text) = perform_ocr(&path) {
+                if !ocr_text.is_empty() && ocr_text.to_lowercase().contains(&ctx.keyword) {
+                    let _ = result_tx.send(ScanResult {
+                        file_path: path.to_string_lossy().to_string(),
+                        file_name: file_name.clone(),
+                        match_type: "ocr".to_string(),
+                        match_line: None,
+                        match_context: Some(ocr_text),
+                        file_size: metadata.len(),
+                        file_extension: extension.clone(),
+                        is_dir: false,
+                    });
+                    matched = true;
+                }
             }
         }
 
-        // Content-based matching (only for files with allowed extensions)
-        if !ext_allowed {
-            continue;
+        // 2. EXIF data matching
+        if !matched && ctx.scan_types.contains(&"exif_data".to_string()) && is_image_file(&extension) {
+            if let Ok(exif_data) = extract_exif(&path) {
+                if exif_data.to_lowercase().contains(&ctx.keyword) {
+                    let _ = result_tx.send(ScanResult {
+                        file_path: path.to_string_lossy().to_string(),
+                        file_name: file_name.clone(),
+                        match_type: "exif".to_string(),
+                        match_line: None,
+                        match_context: Some(exif_data),
+                        file_size: metadata.len(),
+                        file_extension: extension.clone(),
+                        is_dir: false,
+                    });
+                    matched = true;
+                }
+            }
         }
 
-        // Text content matching
-        if ctx.scan_types.contains(&"text_content".to_string()) && is_text_file(&extension) {
+        // 3. Text content matching
+        if !matched && ext_allowed && ctx.scan_types.contains(&"text_content".to_string()) && is_text_file(&extension) {
             if let Ok(content) = fs::read_to_string(&path) {
                 for (line_num, line) in content.lines().enumerate() {
                     if line.to_lowercase().contains(&ctx.keyword) {
@@ -367,46 +415,26 @@ fn search_directory(
                             file_extension: extension.clone(),
                             is_dir: false,
                         });
+                        matched = true;
                         break;
                     }
                 }
             }
         }
 
-        // EXIF data matching
-        if ctx.scan_types.contains(&"exif_data".to_string()) && is_image_file(&extension) {
-            if let Ok(exif_data) = extract_exif(&path) {
-                if exif_data.to_lowercase().contains(&ctx.keyword) {
-                    let _ = result_tx.send(ScanResult {
-                        file_path: path.to_string_lossy().to_string(),
-                        file_name: file_name.clone(),
-                        match_type: "exif".to_string(),
-                        match_line: None,
-                        match_context: Some(exif_data),
-                        file_size: metadata.len(),
-                        file_extension: extension.clone(),
-                        is_dir: false,
-                    });
-                }
-            }
-        }
-
-        // OCR text matching (macOS only)
-        #[cfg(target_os = "macos")]
-        if ctx.scan_types.contains(&"ocr_text".to_string()) && is_image_file(&extension) {
-            if let Ok(ocr_text) = perform_ocr(&path) {
-                if !ocr_text.is_empty() && ocr_text.to_lowercase().contains(&ctx.keyword) {
-                    let _ = result_tx.send(ScanResult {
-                        file_path: path.to_string_lossy().to_string(),
-                        file_name: file_name.clone(),
-                        match_type: "ocr".to_string(),
-                        match_line: None,
-                        match_context: Some(ocr_text),
-                        file_size: metadata.len(),
-                        file_extension: extension.clone(),
-                        is_dir: false,
-                    });
-                }
+        // 4. File name matching (lowest priority)
+        if !matched && ctx.scan_types.contains(&"file_name".to_string()) {
+            if file_name.to_lowercase().contains(&ctx.keyword) {
+                let _ = result_tx.send(ScanResult {
+                    file_path: path.to_string_lossy().to_string(),
+                    file_name: file_name.clone(),
+                    match_type: "filename".to_string(),
+                    match_line: None,
+                    match_context: Some(file_name.clone()),
+                    file_size: metadata.len(),
+                    file_extension: extension.clone(),
+                    is_dir: false,
+                });
             }
         }
     }
