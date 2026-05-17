@@ -6,7 +6,7 @@
 
 <p align="center">
   <em>ファイルを照らす</em><br>
-  <code>OCR</code> <code>全文検索</code> <code>EXIF</code> <code>Tauri</code> <code>macOS</code>
+  🔍 OCR · 📄 全文検索 · 🏷️ EXIF · ⚡ Tauri · 🍎 macOS
 </p>
 
 <p align="center">

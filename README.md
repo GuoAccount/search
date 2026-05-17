@@ -6,7 +6,7 @@
 
 <p align="center">
   <em>Illuminate your files</em><br>
-  <code>OCR</code> <code>全文搜索</code> <code>EXIF</code> <code>Tauri</code> <code>macOS</code>
+  🔍 OCR · 📄 全文搜索 · 🏷️ EXIF · ⚡ Tauri · 🍎 macOS
 </p>
 
 <p align="center">

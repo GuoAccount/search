@@ -6,7 +6,7 @@
 
 <p align="center">
   <em>파일을 비추다</em><br>
-  <code>OCR</code> <code>전체 텍스트 검색</code> <code>EXIF</code> <code>Tauri</code> <code>macOS</code>
+  🔍 OCR · 📄 전체 텍스트 검색 · 🏷️ EXIF · ⚡ Tauri · 🍎 macOS
 </p>
 
 <p align="center">
