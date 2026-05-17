@@ -76,8 +76,8 @@ async fn start_scan(
     let should_cancel_clone = should_cancel.clone();
     
     // Store cancel flag
-    let cancel_store = state.inner().clone();
-    let cancel_sid = sid.clone();
+    let _cancel_store = state.inner().clone();
+    let _cancel_sid = sid.clone();
     
     tokio::spawn(async move {
         let store_for_result = store.clone();

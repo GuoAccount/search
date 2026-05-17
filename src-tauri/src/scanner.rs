@@ -48,7 +48,7 @@ pub fn scan_directory_with_callback(config: crate::ScanConfig, callback: ScanCal
         .filter_map(|e| e.ok())
         .collect();
     
-    let total = entries.len() as u32;
+    let _total = entries.len() as u32;
     
     // Process entries sequentially for real-time updates
     for (index, entry) in entries.iter().enumerate() {

@@ -25,6 +25,9 @@ import {
   SlidersHorizontal,
   ExternalLink,
   ScanEye,
+  Sun,
+  Moon,
+  Monitor,
 } from "lucide-react";
 import "./index.css";
 import "./App.css";
@@ -115,6 +118,8 @@ const DEFAULT_PRESETS: Record<string, FileTypePreset> = {
 // Persistence helpers
 const STORAGE_KEY = "filescope_settings";
 
+type Theme = "light" | "dark" | "system";
+
 interface AppSettings {
   scanPath: string;
   keyword: string;
@@ -122,6 +127,7 @@ interface AppSettings {
   customExtensions: Record<string, string[]>;
   ocrEnabled: boolean;
   sidebarOpen: boolean;
+  theme: Theme;
 }
 
 function loadSettings(): AppSettings {
@@ -140,6 +146,7 @@ function loadSettings(): AppSettings {
     customExtensions: {},
     ocrEnabled: false,
     sidebarOpen: true,
+    theme: "system",
   };
 }
 
@@ -169,6 +176,11 @@ function App() {
   useEffect(() => {
     saveSettings(settings);
   }, [settings]);
+
+  // Apply theme to document
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", settings.theme);
+  }, [settings.theme]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -517,25 +529,61 @@ function App() {
                           <input type="text" className="ext-input" placeholder="添加扩展名" onKeyDown={(e) => { if (e.key === "Enter") { handleAddExtension(key, e.currentTarget.value); e.currentTarget.value = ""; } }} />
                           <button className="ext-add-btn" onClick={(e) => { const input = (e.currentTarget.previousElementSibling as HTMLInputElement); handleAddExtension(key, input.value); input.value = ""; }}><Plus size={12} /></button>
                         </div>
+                        {key === "image" && (
+                          <div className="ocr-option">
+                            <label className="ocr-option-toggle">
+                              <input
+                                type="checkbox"
+                                checked={settings.ocrEnabled}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    const p = navigator.platform.toLowerCase();
+                                    if (p.includes("linux")) {
+                                      alert("Linux 平台暂不支持 OCR 功能");
+                                      return;
+                                    }
+                                  }
+                                  updateSettings({ ocrEnabled: e.target.checked });
+                                }}
+                              />
+                              <span className="ocr-option-slider"></span>
+                            </label>
+                            <div className="ocr-option-info">
+                              <ScanEye size={13} />
+                              <span className="ocr-option-label">OCR 文字识别</span>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
                 );
               })}
             </div>
-            {settings.enabledPresets.includes("image") && (
-              <div className="sidebar-section">
-                <div className="sidebar-section-title"><ScanEye size={14} /><span>图片 OCR</span></div>
-                <div className="ocr-toggle">
-                  <label className="toggle-switch">
-                    <input type="checkbox" checked={settings.ocrEnabled} onChange={(e) => { if (e.target.checked) { const p = navigator.platform.toLowerCase(); if (p.includes("linux")) { alert("Linux 平台暂不支持 OCR 功能"); return; } } updateSettings({ ocrEnabled: e.target.checked }); }} />
-                    <span className="toggle-slider"></span>
-                  </label>
-                  <div className="toggle-info"><span className="toggle-label">启用文字识别</span><span className="toggle-desc">识别图片中的文字内容</span></div>
-                </div>
-              </div>
-            )}
             <div className="sidebar-footer">
+              <div className="theme-switcher">
+                <button
+                  className={`theme-btn ${settings.theme === "light" ? "active" : ""}`}
+                  onClick={() => updateSettings({ theme: "light" })}
+                  title="浅色模式"
+                >
+                  <Sun size={14} />
+                </button>
+                <button
+                  className={`theme-btn ${settings.theme === "dark" ? "active" : ""}`}
+                  onClick={() => updateSettings({ theme: "dark" })}
+                  title="深色模式"
+                >
+                  <Moon size={14} />
+                </button>
+                <button
+                  className={`theme-btn ${settings.theme === "system" ? "active" : ""}`}
+                  onClick={() => updateSettings({ theme: "system" })}
+                  title="跟随系统"
+                >
+                  <Monitor size={14} />
+                </button>
+              </div>
               <div className="sidebar-info"><span>{selectedCount} 类 · {extCount} 种格式</span>{settings.ocrEnabled && <span> · OCR 已启用</span>}</div>
             </div>
           </div>
@@ -559,7 +607,7 @@ function App() {
             <div className="search-bar">
               <div className="search-row">
                 <div className="search-input-wrapper">
-                  <Search size={15} className="search-icon" />
+                  <Search size={14} className="search-icon" />
                   <input type="text" className="search-input" placeholder="输入关键字搜索文件..." value={settings.keyword} onChange={(e) => updateSettings({ keyword: e.target.value })} onKeyDown={(e) => e.key === "Enter" && !isScanning && handleStartScan()} />
                 </div>
                 {isScanning ? (
