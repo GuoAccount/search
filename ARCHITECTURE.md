@@ -4,7 +4,7 @@
 
 ## 系统形态
 
-- 产品：FileScope
+- 产品：Lumina
 - 主用户流程：选择目录 → 输入关键字 → 搜索文件 → 查看结果 → 操作文件
 - 运行面：desktop (Tauri 2)
 - 产品行为详情：`docs/scan-flow.md`

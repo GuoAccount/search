@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="src-tauri/icons/128x128@2x.png" width="128" height="128" alt="FileScope Icon" />
+  <img src="src-tauri/icons/128x128@2x.png" width="128" height="128" alt="Lumina Icon" />
 </p>
 
-<h1 align="center">FileScope</h1>
+<h1 align="center">Lumina</h1>
 
 <p align="center">
   <strong>基于 Tauri 2 + React 构建的高速原生文件搜索与管理工具</strong>

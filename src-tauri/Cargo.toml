@@ -1,5 +1,5 @@
 [package]
-name = "search"
+name = "lumina"
 version = "2.2.0"
 description = "A Tauri App"
 authors = ["you"]
