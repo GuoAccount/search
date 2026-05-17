@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
-use crate::types::{ContextLine, FilePreview};
+use crate::types::{ContextLine, FilePreview, ScanStore};
 
 #[tauri::command]
 pub async fn read_file_preview(
@@ -67,12 +67,27 @@ pub async fn read_file_preview(
 }
 
 #[tauri::command]
-pub async fn move_to_trash(file_paths: Vec<String>) -> Result<u32, String> {
+pub async fn move_to_trash(
+    file_paths: Vec<String>,
+    scan_id: Option<String>,
+    state: tauri::State<'_, ScanStore>,
+) -> Result<u32, String> {
     let mut count = 0;
-    for path in file_paths {
-        let p = PathBuf::from(&path);
+    for path in &file_paths {
+        let p = PathBuf::from(path);
         if trash::delete(&p).is_ok() {
             count += 1;
+        }
+    }
+
+    // Remove deleted files from scan store to prevent polling from resurrecting them
+    if let Some(sid) = scan_id {
+        if count > 0 {
+            let mut store = state.lock().unwrap();
+            if let Some(progress) = store.get_mut(&sid) {
+                progress.results.retain(|r| !file_paths.contains(&r.file_path));
+                progress.results_found = progress.results.len() as u32;
+            }
         }
     }
     

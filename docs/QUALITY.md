@@ -73,6 +73,6 @@
 
 ## 🟢 技术债
 
-- 所有组件的 CSS Modules 待完善（部分组件样式不完整）
+- 文件预览组件样式待完善
 - 动态导入 `@tauri-apps/api/core` 应统一为静态导入
 - scanner.rs 中 ScanType 枚举未使用（已改为字符串比较）

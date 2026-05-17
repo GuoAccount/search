@@ -53,6 +53,15 @@
    - 问题：`defaultExts` 写死为0
    - 修复：从 `DEFAULT_PRESETS` 获取默认扩展名数量
 
+7. **扩展名筛选bug** (`scanner.rs:450`)
+   - 问题：文件名匹配未检查 `ext_allowed`，只选图片时仍能搜到 zip
+   - 修复：文件名匹配条件增加 `ext_allowed &&` 检查
+8. **删除文件复活bug** (`file_ops.rs` + `ResultsToolbar.tsx`)
+   - 问题：`move_to_trash` 只删磁盘不删 `ScanStore`，前端轮询覆盖本地过滤列表
+   - 修复：`move_to_trash` 新增 `scan_id` 参数，删除文件后同步清理 `ScanStore`
+
+**正在验证：**
+- OCR搜索图片文字功能
+
 **待验证：**
 - 大目录确认流程是否正常工作
-- OCR搜索图片文字功能

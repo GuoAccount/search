@@ -6,6 +6,7 @@
   height: 100vh;
   background: var(--color-window-bg);
   overflow: hidden;
+  border-radius: 20px;
 }
 
 .main-wrap {
@@ -22,18 +23,17 @@
   min-width: 0;
   overflow: hidden;
   background: var(--color-content-bg);
-  border-top-left-radius: 20px;
-  border-bottom-left-radius: 20px;
+  border-radius: 20px;
   z-index: 2;
-  box-shadow: var(--shadow-sidebar), var(--border-sidebar);
-  margin-left: 220px;
-  transition: margin-left 0.3s var(--ease-smooth);
-  will-change: margin-left;
+  box-shadow: var(--shadow-card);
+  margin: 6px 6px 6px 226px;
+  transition: margin 0.3s var(--ease-smooth);
+  will-change: margin;
 }
 
 .main-wrap:not(.is-open) .content-col {
-  margin-left: 0;
-  box-shadow: none;
+  margin: 6px;
+  box-shadow: var(--shadow-card);
 }
 
 .content-header {
@@ -123,24 +123,12 @@
   align-items: center;
   justify-content: center;
   color: var(--color-secondary-label);
-  background: var(--btn-bg);
-  border: 0.5px solid var(--btn-border);
-  box-shadow: var(--btn-shadow);
   border-radius: 6px;
   z-index: 50;
   -webkit-app-region: no-drag;
-  transition: color 0.1s var(--ease-out), background 0.1s var(--ease-out), left 0.3s var(--ease-smooth);
+  transition: left 0.3s var(--ease-smooth);
 }
 
 .fixed-toggle.fullscreen {
   left: 20px;
-}
-
-.fixed-toggle:hover {
-  color: var(--color-label);
-  background: var(--btn-bg-hover);
-}
-
-.fixed-toggle:active {
-  background: var(--btn-bg-active);
 }

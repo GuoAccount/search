@@ -28,15 +28,29 @@ func performOCR(on imagePath: String) {
         try handler.perform([request])
         
         guard let observations = request.results else {
-            print("")
+            print("[]")
             exit(0)
         }
         
-        let recognizedText = observations
-            .compactMap { $0.topCandidates(1).first?.string }
-            .joined(separator: "\n")
+        let imageW = CGFloat(cgImage.width)
+        let imageH = CGFloat(cgImage.height)
         
-        print(recognizedText)
+        var regions: [[String: Any]] = []
+        for obs in observations {
+            let bbox = obs.boundingBox
+            if let text = obs.topCandidates(1).first?.string, !text.isEmpty {
+                regions.append([
+                    "text": text,
+                    "x": Double(bbox.origin.x),
+                    "y": Double(bbox.origin.y),
+                    "w": Double(bbox.size.width),
+                    "h": Double(bbox.size.height),
+                ])
+            }
+        }
+        
+        let json = try JSONSerialization.data(withJSONObject: regions, options: [])
+        print(String(data: json, encoding: .utf8) ?? "[]")
     } catch {
         print("ERROR: \(error.localizedDescription)")
         exit(1)

@@ -70,25 +70,24 @@ export function PresetSelector() {
               <span className={styles.count}>
                 {preset.extensions.length + custom.length}
               </span>
-              {isEnabled && (
-                <button
-                  className={styles.expandBtn}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setExpandedPresets((prev) => {
-                      const next = new Set(prev);
-                      next.has(key) ? next.delete(key) : next.add(key);
-                      return next;
-                    });
-                  }}
-                >
-                  {isExpanded ? (
-                    <ChevronDown size={14} />
-                  ) : (
-                    <ChevronRight size={14} />
-                  )}
-                </button>
-              )}
+              <button
+                className={`${styles.expandBtn} ${isEnabled ? "" : styles.hidden}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!isEnabled) return;
+                  setExpandedPresets((prev) => {
+                    const next = new Set(prev);
+                    next.has(key) ? next.delete(key) : next.add(key);
+                    return next;
+                  });
+                }}
+              >
+                {isExpanded ? (
+                  <ChevronDown size={14} />
+                ) : (
+                  <ChevronRight size={14} />
+                )}
+              </button>
             </div>
             {isEnabled && isExpanded && (
               <div className={styles.extensions}>

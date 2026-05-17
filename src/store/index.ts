@@ -6,6 +6,7 @@ import {
   ScanConfig,
   FilePreview,
   AppConfig,
+  ImagePreview,
 } from "../types";
 import { loadSettings, saveSettings } from "../utils/storage";
 import { getAllExtensions } from "../utils/file";
@@ -23,7 +24,7 @@ interface AppState {
   // UI state
   selectedResults: Set<string>;
   previewFile: FilePreview | null;
-  previewImage: string | null;
+  previewImage: ImagePreview | null;
   activeTab: string;
   expandedFolders: Set<string>;
   expandedPresets: Set<string>;
@@ -51,7 +52,7 @@ interface AppState {
   setScanProgress: (progress: ScanProgress | null | ((prev: ScanProgress | null) => ScanProgress | null)) => void;
   setSelectedResults: (results: Set<string> | ((prev: Set<string>) => Set<string>)) => void;
   setPreviewFile: (file: FilePreview | null) => void;
-  setPreviewImage: (image: string | null) => void;
+  setPreviewImage: (image: ImagePreview | null) => void;
   setActiveTab: (tab: string) => void;
   setExpandedFolders: (folders: Set<string> | ((prev: Set<string>) => Set<string>)) => void;
   setExpandedPresets: (presets: Set<string> | ((prev: Set<string>) => Set<string>)) => void;

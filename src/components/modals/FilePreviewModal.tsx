@@ -1,9 +1,19 @@
+import { useEffect } from "react";
 import { useStore } from "../../store";
 import { Eye, X } from "lucide-react";
 import styles from "./FilePreviewModal.module.css";
 
 export function FilePreviewModal() {
   const { previewFile, setPreviewFile } = useStore();
+
+  useEffect(() => {
+    if (!previewFile) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setPreviewFile(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [previewFile, setPreviewFile]);
 
   if (!previewFile) return null;
 

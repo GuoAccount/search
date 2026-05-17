@@ -1,5 +1,5 @@
 import { useStore } from "../../store";
-import { buildTree } from "../../utils/file";
+import { buildTree, getFileDir } from "../../utils/file";
 import { getFileCategory } from "../../utils/file";
 import {
   FolderOpen,
@@ -10,6 +10,7 @@ import {
   Settings,
   File,
   Eye,
+  Search,
 } from "lucide-react";
 import styles from "./ResultsTree.module.css";
 
@@ -63,7 +64,8 @@ export function ResultsTree() {
         const base64 = await invoke<string>("read_image_as_base64", {
           filePath: result.file_path,
         });
-        setPreviewImage(base64);
+        const bboxes = result.match_bboxes ? JSON.parse(result.match_bboxes) : [];
+        setPreviewImage({ base64, bboxes });
       } catch (err) {
         console.error("Failed to load image:", err);
       }
@@ -79,6 +81,15 @@ export function ResultsTree() {
       setPreviewFile(preview);
     } catch (err) {
       console.error("Failed to read file:", err);
+    }
+  };
+
+  const handleRevealInFinder = async (filePath: string) => {
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("reveal_in_finder", { filePath });
+    } catch (err) {
+      console.error("Failed to reveal in finder:", err);
     }
   };
 
@@ -123,12 +134,28 @@ export function ResultsTree() {
               handleToggleSelect(node.result.file_path);
             }
           }}
-          onDoubleClick={() => node.result && handlePreviewFile(node.result)}
         >
           <div className={styles.icon}>
             {getFileIcon(node.isDir ? node.path : node.name, node.isDir)}
           </div>
-          <span className={styles.name}>{node.name}</span>
+          <div className={styles.fileInfo}>
+            <span className={styles.name}>{node.name}</span>
+            {node.result && (
+              <div className={styles.pathRow}>
+                <span className={styles.path}>{getFileDir(node.result.file_path)}</span>
+                <button
+                  className={styles.revealBtn}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRevealInFinder(node.result.file_path);
+                  }}
+                  title="在 Finder 中显示"
+                >
+                  <Search size={10} />
+                </button>
+              </div>
+            )}
+          </div>
           {node.result && (
             <>
               <span className={styles.matchType}>
@@ -190,12 +217,26 @@ export function ResultsTree() {
               className={`${styles.item} ${isSelected ? styles.selected : ""}`}
               style={{ paddingLeft: "8px" }}
               onClick={() => handleToggleSelect(result.file_path)}
-              onDoubleClick={() => handlePreviewFile(result)}
             >
               <div className={styles.icon}>
                 {getFileIcon(result.file_extension, false)}
               </div>
-              <span className={styles.name}>{result.file_name}</span>
+              <div className={styles.fileInfo}>
+                <span className={styles.name}>{result.file_name}</span>
+                <div className={styles.pathRow}>
+                  <span className={styles.path}>{getFileDir(result.file_path)}</span>
+                  <button
+                    className={styles.revealBtn}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRevealInFinder(result.file_path);
+                    }}
+                    title="在 Finder 中显示"
+                  >
+                    <Search size={10} />
+                  </button>
+                </div>
+              </div>
               <span className={styles.matchType}>
                 {result.match_type === "filename"
                   ? "文件名"

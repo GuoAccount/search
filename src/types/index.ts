@@ -24,9 +24,22 @@ export interface ScanResult {
   match_type: string;
   match_line: number | null;
   match_context: string | null;
+  match_bboxes: string | null;
   file_size: number;
   file_extension: string;
   is_dir: boolean;
+}
+
+export interface OCRBox {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export interface ImagePreview {
+  base64: string;
+  bboxes: OCRBox[];
 }
 
 export interface ScanProgress {

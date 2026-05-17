@@ -50,6 +50,12 @@ export function formatFileSize(bytes: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
 }
 
+export function getFileDir(filePath: string): string {
+  const parts = filePath.split("/");
+  parts.pop();
+  return parts.join("/") || "/";
+}
+
 export function buildTree(results: ScanResult[]): TreeNode {
   const root: TreeNode = {
     name: "root",

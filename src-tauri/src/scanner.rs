@@ -20,9 +20,19 @@ pub struct ScanResult {
     pub match_type: String,
     pub match_line: Option<u32>,
     pub match_context: Option<String>,
+    pub match_bboxes: Option<String>,
     pub file_size: u64,
     pub file_extension: String,
     pub is_dir: bool,
+}
+
+#[derive(Debug, Deserialize)]
+struct OCRRegion {
+    text: String,
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
 }
 
 pub struct ScanCallback {
@@ -364,14 +374,26 @@ fn search_directory(
         // 1. OCR text matching (highest priority for images)
         #[cfg(target_os = "macos")]
         if !matched && ctx.scan_types.contains(&"ocr_text".to_string()) && is_image_file(&extension) {
-            if let Ok(ocr_text) = perform_ocr(&path) {
-                if !ocr_text.is_empty() && ocr_text.to_lowercase().contains(&ctx.keyword) {
+            if let Ok(regions) = perform_ocr(&path) {
+                let all_text: Vec<&str> = regions.iter().map(|r| r.text.as_str()).collect();
+                let joined = all_text.join("\n");
+                if !joined.is_empty() && joined.to_lowercase().contains(&ctx.keyword) {
+                    let matched_bboxes: Vec<serde_json::Value> = regions.iter()
+                        .filter(|r| r.text.to_lowercase().contains(&ctx.keyword))
+                        .map(|r| serde_json::json!({"x": r.x, "y": r.y, "w": r.w, "h": r.h}))
+                        .collect();
+                    let bboxes_json = if matched_bboxes.is_empty() {
+                        None
+                    } else {
+                        Some(serde_json::to_string(&matched_bboxes).unwrap_or_default())
+                    };
                     let _ = result_tx.send(ScanResult {
                         file_path: path.to_string_lossy().to_string(),
                         file_name: file_name.clone(),
                         match_type: "ocr".to_string(),
                         match_line: None,
-                        match_context: Some(ocr_text),
+                        match_context: Some(joined),
+                        match_bboxes: bboxes_json,
                         file_size: metadata.len(),
                         file_extension: extension.clone(),
                         is_dir: false,
@@ -391,6 +413,7 @@ fn search_directory(
                         match_type: "exif".to_string(),
                         match_line: None,
                         match_context: Some(exif_data),
+                        match_bboxes: None,
                         file_size: metadata.len(),
                         file_extension: extension.clone(),
                         is_dir: false,
@@ -408,10 +431,11 @@ fn search_directory(
                         let _ = result_tx.send(ScanResult {
                             file_path: path.to_string_lossy().to_string(),
                             file_name: file_name.clone(),
-                            match_type: "content".to_string(),
-                            match_line: Some((line_num + 1) as u32),
-                            match_context: Some(line.to_string()),
-                            file_size: metadata.len(),
+                        match_type: "content".to_string(),
+                        match_line: Some((line_num + 1) as u32),
+                        match_context: Some(line.to_string()),
+                        match_bboxes: None,
+                        file_size: metadata.len(),
                             file_extension: extension.clone(),
                             is_dir: false,
                         });
@@ -423,15 +447,16 @@ fn search_directory(
         }
 
         // 4. File name matching (lowest priority)
-        if !matched && ctx.scan_types.contains(&"file_name".to_string()) {
+        if !matched && ext_allowed && ctx.scan_types.contains(&"file_name".to_string()) {
             if file_name.to_lowercase().contains(&ctx.keyword) {
                 let _ = result_tx.send(ScanResult {
                     file_path: path.to_string_lossy().to_string(),
                     file_name: file_name.clone(),
-                    match_type: "filename".to_string(),
-                    match_line: None,
-                    match_context: Some(file_name.clone()),
-                    file_size: metadata.len(),
+                        match_type: "filename".to_string(),
+                        match_line: None,
+                        match_context: Some(file_name.clone()),
+                        match_bboxes: None,
+                        file_size: metadata.len(),
                     file_extension: extension.clone(),
                     is_dir: false,
                 });
@@ -518,7 +543,7 @@ fn extract_exif(path: &Path) -> Result<String, String> {
     Ok(exif_data.join("; "))
 }
 
-fn perform_ocr(path: &Path) -> Result<String, String> {
+fn perform_ocr(path: &Path) -> Result<Vec<OCRRegion>, String> {
     let script = include_str!("../resources/ocr.swift");
     let temp_dir = std::env::temp_dir();
     let temp_script = temp_dir.join("filescope_ocr.swift");
@@ -530,8 +555,15 @@ fn perform_ocr(path: &Path) -> Result<String, String> {
         .map_err(|e| e.to_string())?;
     let _ = fs::remove_file(&temp_script);
     if output.status.success() {
-        let text = String::from_utf8_lossy(&output.stdout).to_string();
-        Ok(text.trim().to_string())
+        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+        let trimmed = stdout.trim().to_string();
+        if trimmed.starts_with('[') {
+            serde_json::from_str(&trimmed).map_err(|e| e.to_string())
+        } else if trimmed.starts_with("ERROR") {
+            Err(trimmed)
+        } else {
+            Err("Unexpected OCR output".to_string())
+        }
     } else {
         let error = String::from_utf8_lossy(&output.stderr).to_string();
         Err(error)

@@ -57,6 +57,7 @@ export function ResultsToolbar() {
       const { invoke } = await import("@tauri-apps/api/core");
       await invoke<number>("move_to_trash", {
         filePaths: Array.from(selectedResults),
+        scanId: scanProgress.scan_id,
       });
       const remaining = scanProgress.results.filter(
         (r) => !selectedResults.has(r.file_path)

@@ -10,8 +10,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 28px;
-  padding-right: 8px;
+  height: 36px;
+  padding-right: 12px;
   cursor: pointer;
   transition: background 0.12s var(--ease-out);
 }
@@ -30,12 +30,58 @@
 }
 
 .name {
-  flex: 1;
   font-size: 12px;
+  line-height: 1;
   color: var(--color-label);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.fileInfo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.pathRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.path {
+  font-size: 10px;
+  line-height: 1;
+  color: var(--color-tertiary-label);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.8;
+}
+
+.revealBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-sm);
+  color: var(--color-tertiary-label);
+  flex-shrink: 0;
+  opacity: 0;
+  transition: all 0.15s var(--ease-out);
+}
+
+.item:hover .revealBtn {
+  opacity: 1;
+}
+
+.revealBtn:hover {
+  background: var(--color-hover);
+  color: var(--color-label);
 }
 
 .matchType {
