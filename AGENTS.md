@@ -33,6 +33,7 @@
 - 如果某类 review feedback 反复出现，把它升级成机械规则、检查或 linter，不要一直在聊天里重复解释。
 - 生成物放进 `docs/generated/`，外部 reference 放进 `docs/references/`。
 - 需要更多细节时，优先补小而新的文档，而不是继续把这个文件写长。
+- **发版前必须先升级版本号**：在创建 git tag 和 GitHub release 之前，必须先更新以下文件中的版本号：`package.json`、`src-tauri/Cargo.toml`、`src-tauri/tauri.conf.json`。
 
 ## 完成定义
 
