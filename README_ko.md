@@ -5,6 +5,10 @@
 <h1 align="center">Lumina</h1>
 
 <p align="center">
+  <em>파일을 비추다</em>
+</p>
+
+<p align="center">
   <strong>Tauri 2 + React로 구축된 고속 네이티브 파일 검색 및 관리 도구</strong>
 </p>
 
