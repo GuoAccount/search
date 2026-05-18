@@ -96,11 +96,18 @@
 .context {
   font-size: 10px;
   color: var(--color-tertiary-label);
-  max-width: 150px;
+  max-width: 200px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   flex-shrink: 0;
+}
+
+.keyword {
+  color: #fff;
+  background: #e53935;
+  border-radius: 2px;
+  padding: 0 1px;
 }
 
 .preview {

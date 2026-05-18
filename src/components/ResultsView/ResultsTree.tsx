@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, ReactNode } from "react";
 import { useStore } from "../../store";
 import { buildTree, getFileDir } from "../../utils/file";
 import { getFileCategory } from "../../utils/file";
@@ -24,8 +24,29 @@ function getParentDirs(filePath: string): string[] {
   return dirs;
 }
 
+function highlightText(text: string, keyword: string): ReactNode {
+  if (!keyword || !text) return text;
+  const lower = text.toLowerCase();
+  const kwLower = keyword.toLowerCase();
+  const parts: { text: string; isMatch: boolean }[] = [];
+  let last = 0;
+  let idx = lower.indexOf(kwLower);
+  while (idx !== -1) {
+    if (idx > last) parts.push({ text: text.slice(last, idx), isMatch: false });
+    parts.push({ text: text.slice(idx, idx + keyword.length), isMatch: true });
+    last = idx + keyword.length;
+    idx = lower.indexOf(kwLower, last);
+  }
+  if (last < text.length) parts.push({ text: text.slice(last), isMatch: false });
+  if (parts.length === 1 && !parts[0].isMatch) return text;
+  return parts.map((p, i) =>
+    p.isMatch ? <span key={i} className={styles.keyword}>{p.text}</span> : <span key={i}>{p.text}</span>
+  );
+}
+
 export function ResultsTree() {
   const {
+    settings,
     scanProgress,
     activeTab,
     expandedFolders,
@@ -116,6 +137,8 @@ export function ResultsTree() {
         filePath: result.file_path,
         matchLine: result.match_line,
         contextLines: 5,
+        keyword: settings.keyword,
+        contextLength: appConfig?.display?.match_context_length || 100,
       });
       setPreviewFile(preview);
     } catch (err) {
@@ -208,7 +231,7 @@ export function ResultsTree() {
               </span>
               {node.result.match_context && (
                 <span className={styles.context}>
-                  {node.result.match_context.substring(0, 50)}
+                  {highlightText(node.result.match_context.substring(0, 80), settings.keyword)}
                 </span>
               )}
             </>
@@ -287,7 +310,7 @@ export function ResultsTree() {
               </span>
               {result.match_context && (
                 <span className={styles.context}>
-                  {result.match_context.substring(0, 50)}
+                  {highlightText(result.match_context.substring(0, 80), settings.keyword)}
                 </span>
               )}
               <button

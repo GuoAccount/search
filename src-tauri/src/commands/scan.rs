@@ -6,14 +6,13 @@ use uuid::Uuid;
 
 use crate::config;
 use crate::scanner::{ScanCallback, ScanResult};
-use crate::types::{PendingConfirmation, DirWork, ScanConfig, ScanProgress, SkippedDir, PauseStore, CancelStore, ScanStore, ChannelStore};
+use crate::types::{PendingConfirmation, DirWork, ScanConfig, ScanProgress, SkippedDir, CancelStore, ScanStore, ChannelStore};
 
 #[tauri::command]
 pub async fn start_scan(
     app_handle: tauri::AppHandle,
     config: ScanConfig,
     state: tauri::State<'_, ScanStore>,
-    pause_state: tauri::State<'_, PauseStore>,
     cancel_state: tauri::State<'_, CancelStore>,
     channel_state: tauri::State<'_, ChannelStore>,
 ) -> Result<String, String> {
@@ -34,9 +33,7 @@ pub async fn start_scan(
     state.lock().unwrap().insert(scan_id.clone(), progress);
 
     let should_cancel = Arc::new(Mutex::new(false));
-    let should_pause = Arc::new(Mutex::new(false));
 
-    pause_state.0.lock().unwrap().insert(scan_id.clone(), should_pause.clone());
     cancel_state.0.lock().unwrap().insert(scan_id.clone(), should_cancel.clone());
 
     // Create work channel
@@ -91,7 +88,6 @@ pub async fn start_scan(
                 }
             }),
             should_cancel: should_cancel.clone(),
-            should_pause: should_pause.clone(),
         };
 
         crate::scanner::scan_directory(config, app_config, callback, work_tx, work_rx);
@@ -132,44 +128,6 @@ pub fn cancel_scan(
     let cancel_store = cancel_state.0.lock().unwrap();
     if let Some(cancel_flag) = cancel_store.get(&scan_id) {
         *cancel_flag.lock().unwrap() = true;
-    }
-
-    Ok(())
-}
-
-#[tauri::command]
-pub fn pause_scan(
-    scan_id: String,
-    state: tauri::State<'_, ScanStore>,
-    pause_state: tauri::State<'_, PauseStore>,
-) -> Result<(), String> {
-    let mut store = state.lock().unwrap();
-    if let Some(progress) = store.get_mut(&scan_id) {
-        progress.status = "paused".to_string();
-    }
-
-    let pause_store = pause_state.0.lock().unwrap();
-    if let Some(pause_flag) = pause_store.get(&scan_id) {
-        *pause_flag.lock().unwrap() = true;
-    }
-
-    Ok(())
-}
-
-#[tauri::command]
-pub fn resume_scan(
-    scan_id: String,
-    state: tauri::State<'_, ScanStore>,
-    pause_state: tauri::State<'_, PauseStore>,
-) -> Result<(), String> {
-    let mut store = state.lock().unwrap();
-    if let Some(progress) = store.get_mut(&scan_id) {
-        progress.status = "scanning".to_string();
-    }
-
-    let pause_store = pause_state.0.lock().unwrap();
-    if let Some(pause_flag) = pause_store.get(&scan_id) {
-        *pause_flag.lock().unwrap() = false;
     }
 
     Ok(())

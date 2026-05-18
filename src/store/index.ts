@@ -41,8 +41,6 @@ interface AppState {
   // Scan actions
   startScan: () => Promise<void>;
   cancelScan: () => Promise<void>;
-  pauseScan: () => Promise<void>;
-  resumeScan: () => Promise<void>;
   respondConfirmation: (confirmationId: string, allow: boolean, remember: boolean) => Promise<void>;
   allowAllConfirmations: () => Promise<void>;
 
@@ -163,38 +161,6 @@ export const useStore = create<AppState>((set, get) => ({
         }
       } catch (err) {
         console.error("Failed to cancel scan:", err);
-      }
-    }
-  },
-
-  pauseScan: async () => {
-    const { scanProgress } = get();
-    if (scanProgress?.scan_id) {
-      try {
-        await invoke("pause_scan", { scanId: scanProgress.scan_id });
-        set((state) => ({
-          scanProgress: state.scanProgress
-            ? { ...state.scanProgress, status: "paused" }
-            : null,
-        }));
-      } catch (err) {
-        console.error("Failed to pause scan:", err);
-      }
-    }
-  },
-
-  resumeScan: async () => {
-    const { scanProgress } = get();
-    if (scanProgress?.scan_id) {
-      try {
-        await invoke("resume_scan", { scanId: scanProgress.scan_id });
-        set((state) => ({
-          scanProgress: state.scanProgress
-            ? { ...state.scanProgress, status: "scanning" }
-            : null,
-        }));
-      } catch (err) {
-        console.error("Failed to resume scan:", err);
       }
     }
   },

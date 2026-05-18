@@ -40,7 +40,7 @@ BFS 线程 ──> work_tx ──> work_rx ──> Dispatcher 线程 ──> Ray
 
 1. 生成唯一 `scan_id`（UUID）
 2. 初始化 `ScanProgress` 结构体，存入 `ScanStore`
-3. 创建 `should_cancel` 和 `should_pause` 标志位
+3. 创建 `should_cancel` 标志位
 4. 创建 `work_tx/work_rx` 通道，将 `work_tx` 存入 `ChannelStore`
 5. 加载 `AppConfig`
 6. 在 `tokio::spawn` 中启动异步任务：
@@ -170,54 +170,9 @@ BFS 遇到大目录 → 发送确认请求 → 前端展示确认面板
 
 ---
 
-## 3. 暂停/恢复流程
+## 3. 取消流程
 
-### 3.1 暂停扫描
-
-**前端**: `src/store/index.ts` - `pauseScan()`
-
-1. 调用 `invoke("pause_scan", { scanId })`
-2. 更新前端状态：`scanProgress.status = "paused"`
-
-**后端**: `src-tauri/src/commands/scan.rs` - `pause_scan()`
-
-1. 更新 `ScanProgress.status` 为 `"paused"`
-2. 设置 `pause_flag` 为 `true`
-
-**扫描引擎**: `src-tauri/src/scanner.rs` - `check_pause()`
-
-```rust
-fn check_pause(pause_flag: &Arc<Mutex<bool>>, cancel_flag: &Arc<Mutex<bool>>) {
-    while *pause_flag.lock().unwrap() {
-        std::thread::sleep(Duration::from_millis(100));
-        if *cancel_flag.lock().unwrap() {
-            return;
-        }
-    }
-}
-```
-
-暂停检查点：
-- BFS 遍历循环中（每个目录处理前）
-- 搜索工作协程中（每个文件处理前）
-
-### 3.2 恢复扫描
-
-**前端**: `src/store/index.ts` - `resumeScan()`
-
-1. 调用 `invoke("resume_scan", { scanId })`
-2. 更新前端状态：`scanProgress.status = "scanning"`
-
-**后端**: `src-tauri/src/commands/scan.rs` - `resume_scan()`
-
-1. 更新 `ScanProgress.status` 为 `"scanning"`
-2. 设置 `pause_flag` 为 `false`
-
----
-
-## 4. 取消流程
-
-### 4.1 前端取消
+### 3.1 前端取消
 
 **文件**: `src/store/index.ts` - `cancelScan()`
 
@@ -225,19 +180,18 @@ fn check_pause(pause_flag: &Arc<Mutex<bool>>, cancel_flag: &Arc<Mutex<bool>>) {
 2. 设置 `isScanning: false`
 3. 清除轮询定时器
 
-### 4.2 后端取消
+### 3.2 后端取消
 
 **文件**: `src-tauri/src/commands/scan.rs` - `cancel_scan()`
 
 1. 更新 `ScanProgress.status` 为 `"cancelled"`
 2. 设置 `cancel_flag` 为 `true`
 
-### 4.3 扫描引擎响应取消
+### 3.3 扫描引擎响应取消
 
 取消检查点：
 - BFS 遍历循环中（每个目录处理前）
 - 搜索工作协程中（每个文件处理前）
-- 暂停等待循环中
 
 取消后：
 - BFS 线程退出循环，`work_tx` 被 drop
@@ -247,9 +201,9 @@ fn check_pause(pause_flag: &Arc<Mutex<bool>>, cancel_flag: &Arc<Mutex<bool>>) {
 
 ---
 
-## 5. 关键数据结构
+## 4. 关键数据结构
 
-### 5.1 ScanConfig
+### 4.1 ScanConfig
 
 **文件**: `src-tauri/src/types.rs`
 
@@ -263,7 +217,7 @@ pub struct ScanConfig {
 }
 ```
 
-### 5.2 DirWork
+### 4.2 DirWork
 
 **文件**: `src-tauri/src/types.rs`
 
@@ -273,7 +227,7 @@ pub struct DirWork {
 }
 ```
 
-### 5.3 ChannelStore
+### 4.3 ChannelStore
 
 **文件**: `src-tauri/src/types.rs`
 
@@ -283,7 +237,7 @@ pub type ChannelStore = Arc<Mutex<HashMap<String, Sender<DirWork>>>>;
 
 存储每个扫描的 `work_tx`，供 `respond_confirmation` 使用。
 
-### 5.4 ScanProgress
+### 4.4 ScanProgress
 
 **文件**: `src-tauri/src/types.rs`
 
@@ -291,7 +245,7 @@ pub type ChannelStore = Arc<Mutex<HashMap<String, Sender<DirWork>>>>;
 pub struct ScanProgress {
     pub scan_id: String,
     pub parent_scan_id: Option<String>,
-    pub status: String,                  // scanning, paused, completed, cancelled
+    pub status: String,                  // scanning, completed, cancelled
     pub files_scanned: u32,
     pub results_found: u32,
     pub current_path: String,
@@ -301,7 +255,7 @@ pub struct ScanProgress {
 }
 ```
 
-### 5.5 PendingConfirmation
+### 4.5 PendingConfirmation
 
 **文件**: `src-tauri/src/types.rs`
 
@@ -313,7 +267,7 @@ pub struct PendingConfirmation {
 }
 ```
 
-### 5.6 ScanResult
+### 4.6 ScanResult
 
 **文件**: `src-tauri/src/scanner.rs`
 
@@ -330,7 +284,7 @@ pub struct ScanResult {
 }
 ```
 
-### 5.7 AppConfig
+### 4.7 AppConfig
 
 **文件**: `src-tauri/src/config.rs`
 
@@ -350,27 +304,22 @@ pub struct ScanSettings {
 
 ---
 
-## 6. 涉及文件和函数汇总
+## 5. 涉及文件和函数汇总
 
 | 文件 | 关键函数 | 作用 |
 |------|----------|------|
 | `src/store/index.ts` | `startScan()` | 启动扫描 |
 | | `cancelScan()` | 取消扫描 |
-| | `pauseScan()` | 暂停扫描 |
-| | `resumeScan()` | 恢复扫描 |
 | | `respondConfirmation()` | 响应确认（通过 work_tx 注入工作项） |
 | | `allowAllConfirmations()` | 允许所有确认 |
 | `src-tauri/src/commands/scan.rs` | `start_scan()` | 创建通道，启动扫描 |
 | | `get_scan_progress()` | 获取进度 |
 | | `cancel_scan()` | 取消扫描 |
-| | `pause_scan()` | 暂停扫描 |
-| | `resume_scan()` | 恢复扫描 |
 | | `respond_confirmation()` | 响应确认，通过 ChannelStore 发送 DirWork |
 | `src-tauri/src/scanner.rs` | `scan_directory()` | 扫描主函数，协调各组件 |
 | | `bfs_scan()` | BFS 线程，遍历目录树并分类 |
 | | `enqueue_dir()` | 分类目录：≤阈值发 DirWork，>阈值发确认 |
 | | `search_directory()` | 搜索工作函数，处理单个目录的文件 |
-| | `check_pause()` | 暂停检查 |
 | | `count_entries_fast()` | 快速统计目录直接子项 |
 | | `is_hidden()` | 判断隐藏文件/目录 |
 | | `matches_rules()` | 规则匹配 |
@@ -388,9 +337,9 @@ pub struct ScanSettings {
 
 ---
 
-## 7. 已解决的问题
+## 6. 已解决的问题
 
-### 7.1 架构改进
+### 6.1 架构改进
 
 | 问题 | 旧方案 | 新方案 |
 |------|--------|--------|
@@ -399,12 +348,11 @@ pub struct ScanSettings {
 | 线程爆炸 | 每个工作项 `std::thread::spawn` | Rayon 线程池（CPU 核心数限制） |
 | 结果延迟 | BFS 完成后才开始返回结果 | 实时返回，BFS 期间就能看到结果 |
 
-### 7.2 仍存在的问题
+### 6.2 仍存在的问题
 
 1. **轮询间隔 200ms** — 频繁 IPC 调用，可考虑 Tauri 事件推送
-2. **暂停使用忙等待** — `while + sleep(100ms)` 消耗 CPU，可改用 Condvar
-3. **确认面板缺少"记住选择"** — `remember` 参数未在 UI 中暴露
-4. **ScanStore 内存泄漏** — 完成的扫描记录不会自动清理
+2. **确认面板缺少"记住选择"** — `remember` 参数未在 UI 中暴露
+3. **ScanStore 内存泄漏** — 完成的扫描记录不会自动清理
 
 ---
 

@@ -223,6 +223,31 @@ export function SettingsPanel() {
                   </p>
                 </div>
                 <div className={styles.field}>
+                  <label className={styles.fieldLabel}>匹配上下文长度</label>
+                  <div className={styles.fieldControl}>
+                    <input
+                      type="number"
+                      min={50}
+                      max={500}
+                      className={styles.input}
+                      value={cfg.display.match_context_length}
+                      onChange={(e) => {
+                        setCfg((prev) => ({
+                          ...prev,
+                          display: {
+                            ...prev.display,
+                            match_context_length: Math.max(50, Math.min(500, parseInt(e.target.value) || 100)),
+                          },
+                        }));
+                      }}
+                    />
+                    <span className={styles.inputSuffix}>字符</span>
+                  </div>
+                  <p className={styles.fieldHint}>
+                    匹配关键字前后各显示的字符数（50-500）
+                  </p>
+                </div>
+                <div className={styles.field}>
                   <label className={styles.fieldLabel}>OCR 匹配描边</label>
                   <div className={styles.fieldControl}>
                     <label className={styles.toggle}>

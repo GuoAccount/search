@@ -25,16 +25,12 @@ function App() {
     updateSettings,
     setAppConfig,
     scanProgress,
-    setShowConfirmPanel,
-    showConfirmPanel,
     isFullscreen,
     setIsFullscreen,
   } = useStore();
 
   const isOpen = settings.sidebarOpen;
-  const lastPendingCount = useRef(0);
   const lastNotifyTime = useRef(0);
-  const pendingNotifyCount = useRef(0);
   const notifyTimer = useRef<number | null>(null);
 
   // Load app config
@@ -83,62 +79,44 @@ function App() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [settings.sidebarOpen]);
 
-  // Notification detection from polling + auto-open confirm panel
+  // Notification: throttle to once per minute, show total pending count
   useEffect(() => {
-    const currentCount = scanProgress?.pending_confirmations.length || 0;
-    if (currentCount > lastPendingCount.current) {
-      const newCount = currentCount - lastPendingCount.current;
+    const totalCount = scanProgress?.pending_confirmations.length || 0;
+    if (totalCount === 0) return;
 
-      // Send system notification
-      const doNotify = () => {
-        sendNotification({ title: "Lumina - 待确认", body: `收到 ${newCount} 个待确认事项` });
-        invoke("play_system_sound").catch(() => {});
-      };
+    const doNotify = (count: number) => {
+      sendNotification({
+        title: "Lumina - 待确认",
+        body: `有 ${count} 个目录等待确认，点击查看`,
+      });
+      invoke("play_system_sound").catch(() => {});
+    };
 
-      const now = Date.now();
-      const THROTTLE_MS = 5000;
-      const timeSinceLastNotify = now - lastNotifyTime.current;
+    const now = Date.now();
+    const THROTTLE_MS = 60_000;
+    const elapsed = now - lastNotifyTime.current;
 
-      if (timeSinceLastNotify < THROTTLE_MS) {
-        pendingNotifyCount.current += 1;
-        if (!notifyTimer.current) {
-          notifyTimer.current = window.setTimeout(() => {
-            const count = pendingNotifyCount.current;
-            if (count > 0) {
-              sendNotification({ title: "Lumina - 待确认", body: `收到 ${count + 1} 个待确认事项` });
-              invoke("play_system_sound").catch(() => {});
-            }
-            pendingNotifyCount.current = 0;
-            notifyTimer.current = null;
-            lastNotifyTime.current = Date.now();
-          }, THROTTLE_MS - timeSinceLastNotify);
+    if (elapsed >= THROTTLE_MS) {
+      doNotify(totalCount);
+      lastNotifyTime.current = now;
+    } else if (!notifyTimer.current) {
+      notifyTimer.current = window.setTimeout(() => {
+        const count = scanProgress?.pending_confirmations.length || 0;
+        if (count > 0) {
+          doNotify(count);
         }
-      } else {
-        doNotify();
-        lastNotifyTime.current = now;
-        pendingNotifyCount.current = 0;
-      }
-
-      // Auto-open confirm panel when new confirmations arrive
-      if (!showConfirmPanel) {
-        setShowConfirmPanel(true);
-      }
+        lastNotifyTime.current = Date.now();
+        notifyTimer.current = null;
+      }, THROTTLE_MS - elapsed);
     }
-    lastPendingCount.current = currentCount;
+
+    return () => {
+      if (notifyTimer.current) {
+        clearTimeout(notifyTimer.current);
+        notifyTimer.current = null;
+      }
+    };
   }, [scanProgress?.pending_confirmations.length]);
-
-  // Auto-open confirm panel when scan completes with pending confirmations
-  useEffect(() => {
-    if (
-      scanProgress &&
-      scanProgress.status === "completed" &&
-      scanProgress.pending_confirmations.length > 0 &&
-      scanProgress.results.length === 0 &&
-      !showConfirmPanel
-    ) {
-      setShowConfirmPanel(true);
-    }
-  }, [scanProgress?.status]);
 
   return (
     <div className="app-container">

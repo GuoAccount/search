@@ -6,7 +6,7 @@ pub mod types;
 pub mod commands;
 mod scanner;
 
-use types::{ScanStore, PauseStore, CancelStore, ChannelStore};
+use types::{ScanStore, CancelStore, ChannelStore};
 
 #[tauri::command]
 fn select_directory() -> Result<String, String> {
@@ -33,7 +33,6 @@ fn reset_config(app_handle: tauri::AppHandle) -> config::AppConfig {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let scan_store: ScanStore = Arc::new(Mutex::new(HashMap::new()));
-    let pause_store = PauseStore(Arc::new(Mutex::new(HashMap::new())));
     let cancel_store = CancelStore(Arc::new(Mutex::new(HashMap::new())));
     let channel_store: ChannelStore = Arc::new(Mutex::new(HashMap::new()));
     
@@ -42,7 +41,6 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .manage(scan_store)
-        .manage(pause_store)
         .manage(cancel_store)
         .manage(channel_store)
         .invoke_handler(tauri::generate_handler![
@@ -53,8 +51,6 @@ pub fn run() {
             commands::scan::start_scan,
             commands::scan::get_scan_progress,
             commands::scan::cancel_scan,
-            commands::scan::pause_scan,
-            commands::scan::resume_scan,
             commands::scan::respond_confirmation,
             commands::file_ops::read_file_preview,
             commands::file_ops::read_image_as_base64,

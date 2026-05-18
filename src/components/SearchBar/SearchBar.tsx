@@ -10,8 +10,6 @@ export function SearchBar() {
     scanProgress,
     startScan,
     cancelScan,
-    pauseScan,
-    resumeScan,
     setShowConfirmPanel,
   } = useStore();
 
@@ -31,16 +29,6 @@ export function SearchBar() {
         </div>
         {isScanning ? (
           <>
-            {scanProgress?.status === "paused" ? (
-              <button className={styles.btn} onClick={resumeScan}>
-                <Scan size={14} />
-                <span>恢复</span>
-              </button>
-            ) : (
-              <button className={styles.btn} onClick={pauseScan}>
-                <span>暂停</span>
-              </button>
-            )}
             <button className={styles.btn} onClick={cancelScan}>
               <Loader2 size={14} className={styles.spin} />
               <span>停止</span>

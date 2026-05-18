@@ -29,8 +29,7 @@
 │                    Backend (Rust)                         │
 │  ┌─────────────────────────────────────────────────────┐ │
 │  │              lib.rs (Tauri 构建入口)                  │ │
-│  │  .manage(ScanStore, PauseStore, CancelStore,         │ │
-│  │         ChannelStore)                                │ │
+│  │  .manage(ScanStore, CancelStore, ChannelStore)        │ │
 │  └─────────────────────────────────────────────────────┘ │
 │  ┌─────────────────────────────────────────────────────┐ │
 │  │              commands/ (Tauri 命令层)                 │ │
@@ -101,6 +100,7 @@ BFS 遇到大目录 → count_entries_fast() > threshold
 
 - 搜索逻辑已重构为 BFS + 搜索工作协程并发架构
 - 2026-05-17: 修复多个关键bug（根目录搜索、重复结果、进度条卡住、格式计数）
+- 2026-05-18: 删除暂停机制，简化代码结构
 - 技术债：dispatch线程使用recv_timeout轮询，未来可考虑事件驱动
 
 ## 变更检查

@@ -45,7 +45,7 @@ export interface ImagePreview {
 export interface ScanProgress {
   scan_id: string;
   parent_scan_id?: string;
-  status: "scanning" | "paused" | "completed" | "cancelled";
+  status: "scanning" | "completed" | "cancelled";
   files_scanned: number;
   results_found: number;
   current_path: string;
@@ -106,6 +106,7 @@ export interface AppConfig {
   display: {
     default_expand_count: number;
     ocr_highlight_enabled: boolean;
+    match_context_length: number;
   };
   skip_rules: string[];
   scan_rules: string[];

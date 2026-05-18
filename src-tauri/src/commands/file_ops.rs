@@ -4,11 +4,42 @@ use std::path::PathBuf;
 
 use crate::types::{ContextLine, FilePreview, ScanStore};
 
+const DEFAULT_CONTEXT_AROUND: usize = 100;
+
+fn extract_context(line: &str, keyword: &str, context_around: usize) -> String {
+    let lower = line.to_lowercase();
+    let kw_lower = keyword.to_lowercase();
+    if let Some(pos) = lower.find(&kw_lower) {
+        let char_start: usize = line[..pos].chars().count();
+        let kw_char_len: usize = keyword.chars().count();
+        let total_chars: usize = line.chars().count();
+
+        let ctx_before = char_start.saturating_sub(context_around);
+        let ctx_after = (char_start + kw_char_len + context_around).min(total_chars);
+
+        let chunk: String = line.chars().skip(ctx_before).take(ctx_after - ctx_before).collect();
+
+        let mut result = String::new();
+        if ctx_before > 0 {
+            result.push_str("…");
+        }
+        result.push_str(&chunk);
+        if ctx_after < total_chars {
+            result.push_str("…");
+        }
+        result
+    } else {
+        line.chars().take(context_around * 2).collect()
+    }
+}
+
 #[tauri::command]
 pub async fn read_file_preview(
     file_path: String,
     match_line: Option<u32>,
     context_lines: u32,
+    keyword: Option<String>,
+    context_length: Option<u32>,
 ) -> Result<FilePreview, String> {
     let path = PathBuf::from(&file_path);
     let file_name = path.file_name()
@@ -47,9 +78,24 @@ pub async fn read_file_preview(
         let end = (center + context_lines as usize).min(lines.len());
         
         for i in start..=end {
+            let raw = lines.get(i - 1).unwrap_or(&"");
+            let ctx_len = context_length.unwrap_or(DEFAULT_CONTEXT_AROUND as u32) as usize;
+            let content = if i == center {
+                if let Some(ref kw) = keyword {
+                    if !kw.is_empty() {
+                        extract_context(raw, kw, ctx_len)
+                    } else {
+                        raw.to_string()
+                    }
+                } else {
+                    raw.to_string()
+                }
+            } else {
+                raw.to_string()
+            };
             context.push(ContextLine {
                 line_number: i as u32,
-                content: lines.get(i - 1).unwrap_or(&"").to_string(),
+                content,
                 is_match: i == center,
             });
         }

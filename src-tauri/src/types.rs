@@ -62,9 +62,6 @@ pub struct ContextLine {
 pub type ScanStore = Arc<Mutex<HashMap<String, ScanProgress>>>;
 
 #[derive(Clone)]
-pub struct PauseStore(pub Arc<Mutex<HashMap<String, Arc<Mutex<bool>>>>>);
-
-#[derive(Clone)]
 pub struct CancelStore(pub Arc<Mutex<HashMap<String, Arc<Mutex<bool>>>>>);
 
 pub struct DirWork {

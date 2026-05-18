@@ -3,8 +3,26 @@ import { useStore } from "../../store";
 import { Eye, X } from "lucide-react";
 import styles from "./FilePreviewModal.module.css";
 
+function highlightKeyword(text: string, keyword: string) {
+  if (!keyword) return text;
+  const lower = text.toLowerCase();
+  const kwLower = keyword.toLowerCase();
+  const parts: { text: string; isMatch: boolean }[] = [];
+  let last = 0;
+  let idx = lower.indexOf(kwLower);
+  while (idx !== -1) {
+    if (idx > last) parts.push({ text: text.slice(last, idx), isMatch: false });
+    parts.push({ text: text.slice(idx, idx + keyword.length), isMatch: true });
+    last = idx + keyword.length;
+    idx = lower.indexOf(kwLower, last);
+  }
+  if (last < text.length) parts.push({ text: text.slice(last), isMatch: false });
+  return parts;
+}
+
 export function FilePreviewModal() {
-  const { previewFile, setPreviewFile } = useStore();
+  const { settings, previewFile, setPreviewFile } = useStore();
+  const keyword = settings.keyword;
 
   useEffect(() => {
     if (!previewFile) return;
@@ -16,6 +34,19 @@ export function FilePreviewModal() {
   }, [previewFile, setPreviewFile]);
 
   if (!previewFile) return null;
+
+  const renderContent = (text: string, isMatchLine: boolean) => {
+    if (!isMatchLine || !keyword) return text;
+    const parts = highlightKeyword(text, keyword);
+    if (typeof parts === "string") return parts;
+    return parts.map((p, i) =>
+      p.isMatch ? (
+        <span key={i} className={styles.keyword}>{p.text}</span>
+      ) : (
+        <span key={i}>{p.text}</span>
+      )
+    );
+  };
 
   return (
     <div className={styles.overlay} onClick={() => setPreviewFile(null)}>
@@ -43,7 +74,9 @@ export function FilePreviewModal() {
                   }`}
                 >
                   <span className={styles.lineNum}>{line.line_number}</span>
-                  <span className={styles.lineContent}>{line.content}</span>
+                  <span className={styles.lineContent}>
+                    {renderContent(line.content, line.is_match)}
+                  </span>
                 </div>
               ))}
             </div>

@@ -13,6 +13,33 @@ use exif::Reader;
 
 use crate::types::{PendingConfirmation, SkippedDir, ScanConfig, DirWork};
 
+fn extract_context(line: &str, keyword: &str, context_around: usize) -> String {
+    let lower = line.to_lowercase();
+    let kw_lower = keyword.to_lowercase();
+    if let Some(pos) = lower.find(&kw_lower) {
+        let char_start: usize = line[..pos].chars().count();
+        let kw_char_len: usize = keyword.chars().count();
+        let total_chars: usize = line.chars().count();
+
+        let ctx_before = char_start.saturating_sub(context_around);
+        let ctx_after = (char_start + kw_char_len + context_around).min(total_chars);
+
+        let chunk: String = line.chars().skip(ctx_before).take(ctx_after - ctx_before).collect();
+
+        let mut result = String::new();
+        if ctx_before > 0 {
+            result.push_str("…");
+        }
+        result.push_str(&chunk);
+        if ctx_after < total_chars {
+            result.push_str("…");
+        }
+        result
+    } else {
+        line.chars().take(context_around * 2).collect()
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ScanResult {
     pub file_path: String,
@@ -41,7 +68,6 @@ pub struct ScanCallback {
     pub on_confirmation_needed: Box<dyn Fn(PendingConfirmation) + Send>,
     pub on_dir_skipped: Box<dyn Fn(SkippedDir) + Send>,
     pub should_cancel: Arc<Mutex<bool>>,
-    pub should_pause: Arc<Mutex<bool>>,
 }
 
 #[derive(Clone)]
@@ -54,6 +80,7 @@ struct ScanContext {
     scan_rules: Vec<String>,
     threshold: u64,
     ask_on_large_dir: bool,
+    context_around: usize,
 }
 
 // ─── Public entry point ───────────────────────────────────────────────────────
@@ -75,19 +102,18 @@ pub fn scan_directory(
         scan_rules: app_config.scan_rules.clone(),
         threshold: app_config.scan.large_dir_threshold,
         ask_on_large_dir: app_config.scan.ask_on_large_dir,
+        context_around: app_config.display.match_context_length as usize,
     });
 
     let (result_tx, result_rx) = mpsc::channel::<ScanResult>();
     let (progress_tx, progress_rx) = mpsc::channel::<(u32, String)>();
 
     let cancel_flag = callback.should_cancel.clone();
-    let pause_flag = callback.should_pause.clone();
     let files_scanned = Arc::new(AtomicU32::new(0));
 
     // 1. BFS thread: traverses tree, classifies directories
     let bfs_ctx = ctx.clone();
     let bfs_cancel = cancel_flag.clone();
-    let bfs_pause = pause_flag.clone();
     let bfs_work_tx = work_tx.clone();
     let bfs_handle = std::thread::spawn(move || {
         bfs_scan(
@@ -97,7 +123,6 @@ pub fn scan_directory(
             &*callback.on_confirmation_needed,
             &*callback.on_dir_skipped,
             &bfs_cancel,
-            &bfs_pause,
         );
     });
 
@@ -138,13 +163,12 @@ pub fn scan_directory(
                     let ptx = ptx_main.clone();
                     let fs = files_scanned.clone();
                     let cf = cancel_flag.clone();
-                    let pf = pause_flag.clone();
                     let active = active_count_clone.clone();
 
                     active.fetch_add(1, Ordering::SeqCst);
 
                     rayon::spawn(move || {
-                        search_directory(&work.path, &ctx, &rtx, &ptx, &fs, &cf, &pf);
+                        search_directory(&work.path, &ctx, &rtx, &ptx, &fs, &cf);
                         active.fetch_sub(1, Ordering::SeqCst);
                     });
                 }
@@ -194,7 +218,6 @@ fn bfs_scan(
     on_confirmation_needed: &dyn Fn(PendingConfirmation),
     on_dir_skipped: &dyn Fn(SkippedDir),
     cancel_flag: &Arc<Mutex<bool>>,
-    pause_flag: &Arc<Mutex<bool>>,
 ) {
     let mut queue = VecDeque::new();
     queue.push_back(root.to_path_buf());
@@ -208,7 +231,6 @@ fn bfs_scan(
         if *cancel_flag.lock().unwrap() {
             break;
         }
-        check_pause(pause_flag, cancel_flag);
 
         let Ok(read_dir) = fs::read_dir(&dir) else {
             continue;
@@ -234,7 +256,7 @@ fn bfs_scan(
             // scan_rules: force scan (highest priority)
             if matches_rules(&path, &ctx.scan_rules) {
                 if path.is_dir() {
-                    enqueue_dir(&path, &ctx, &work_tx, on_confirmation_needed, on_dir_skipped, cancel_flag, pause_flag, &mut queue, &mut sent_dirs);
+                    enqueue_dir(&path, &ctx, &work_tx, on_confirmation_needed, on_dir_skipped, cancel_flag, &mut queue, &mut sent_dirs);
                 }
                 // Files under scan_rules dirs will be handled when BFS sends the dir
                 continue;
@@ -253,7 +275,7 @@ fn bfs_scan(
 
             // Directories: classify by threshold
             if path.is_dir() {
-                enqueue_dir(&path, &ctx, &work_tx, on_confirmation_needed, on_dir_skipped, cancel_flag, pause_flag, &mut queue, &mut sent_dirs);
+                enqueue_dir(&path, &ctx, &work_tx, on_confirmation_needed, on_dir_skipped, cancel_flag, &mut queue, &mut sent_dirs);
             }
             // Files: skip (they'll be processed when their parent dir is sent to work_tx)
         }
@@ -267,8 +289,7 @@ fn enqueue_dir(
     work_tx: &Sender<DirWork>,
     on_confirmation_needed: &dyn Fn(PendingConfirmation),
     on_dir_skipped: &dyn Fn(SkippedDir),
-    cancel_flag: &Arc<Mutex<bool>>,
-    pause_flag: &Arc<Mutex<bool>>,
+    _cancel_flag: &Arc<Mutex<bool>>,
     queue: &mut VecDeque<PathBuf>,
     sent_dirs: &mut std::collections::HashSet<PathBuf>,
 ) {
@@ -307,7 +328,6 @@ fn search_directory(
     progress_tx: &Sender<(u32, String)>,
     files_scanned: &AtomicU32,
     cancel_flag: &Arc<Mutex<bool>>,
-    pause_flag: &Arc<Mutex<bool>>,
 ) {
     let Ok(read_dir) = fs::read_dir(dir) else {
         return;
@@ -319,7 +339,6 @@ fn search_directory(
         if *cancel_flag.lock().unwrap() {
             return;
         }
-        check_pause(pause_flag, cancel_flag);
 
         let path = entry.path();
 
@@ -392,7 +411,7 @@ fn search_directory(
                         file_name: file_name.clone(),
                         match_type: "ocr".to_string(),
                         match_line: None,
-                        match_context: Some(joined),
+                        match_context: Some(extract_context(&joined, &ctx.keyword, ctx.context_around)),
                         match_bboxes: bboxes_json,
                         file_size: metadata.len(),
                         file_extension: extension.clone(),
@@ -412,7 +431,7 @@ fn search_directory(
                         file_name: file_name.clone(),
                         match_type: "exif".to_string(),
                         match_line: None,
-                        match_context: Some(exif_data),
+                        match_context: Some(extract_context(&exif_data, &ctx.keyword, ctx.context_around)),
                         match_bboxes: None,
                         file_size: metadata.len(),
                         file_extension: extension.clone(),
@@ -433,7 +452,7 @@ fn search_directory(
                             file_name: file_name.clone(),
                         match_type: "content".to_string(),
                         match_line: Some((line_num + 1) as u32),
-                        match_context: Some(line.to_string()),
+                        match_context: Some(extract_context(line, &ctx.keyword, ctx.context_around)),
                         match_bboxes: None,
                         file_size: metadata.len(),
                             file_extension: extension.clone(),
@@ -454,7 +473,7 @@ fn search_directory(
                     file_name: file_name.clone(),
                         match_type: "filename".to_string(),
                         match_line: None,
-                        match_context: Some(file_name.clone()),
+                        match_context: Some(extract_context(&file_name, &ctx.keyword, ctx.context_around)),
                         match_bboxes: None,
                         file_size: metadata.len(),
                     file_extension: extension.clone(),
@@ -500,15 +519,6 @@ fn count_entries_fast(path: &Path) -> u64 {
     fs::read_dir(path)
         .map(|entries| entries.filter_map(|e| e.ok()).count() as u64)
         .unwrap_or(0)
-}
-
-fn check_pause(pause_flag: &Arc<Mutex<bool>>, cancel_flag: &Arc<Mutex<bool>>) {
-    while *pause_flag.lock().unwrap() {
-        std::thread::sleep(Duration::from_millis(100));
-        if *cancel_flag.lock().unwrap() {
-            return;
-        }
-    }
 }
 
 fn is_text_file(extension: &str) -> bool {

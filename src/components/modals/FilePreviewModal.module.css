@@ -99,6 +99,13 @@
   word-break: break-all;
 }
 
+.keyword {
+  color: #fff;
+  background: #e53935;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
 .empty {
   display: flex;
   align-items: center;

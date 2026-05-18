@@ -23,6 +23,12 @@ pub struct ScanSettings {
 pub struct DisplaySettings {
     pub default_expand_count: u32,
     pub ocr_highlight_enabled: bool,
+    #[serde(default = "default_match_context_length")]
+    pub match_context_length: u32,
+}
+
+fn default_match_context_length() -> u32 {
+    100
 }
 
 impl Default for DisplaySettings {
@@ -30,6 +36,7 @@ impl Default for DisplaySettings {
         DisplaySettings {
             default_expand_count: 1,
             ocr_highlight_enabled: true,
+            match_context_length: 100,
         }
     }
 }
@@ -45,6 +52,7 @@ impl Default for AppConfig {
             display: DisplaySettings {
                 default_expand_count: 1,
                 ocr_highlight_enabled: true,
+                match_context_length: 100,
             },
             skip_rules: vec![
                 "node_modules".into(),
