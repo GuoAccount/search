@@ -37,6 +37,74 @@
 
 ---
 
+## 🟡 Bug 清单
+
+### BUG-003: macOS 红绿灯位置在不同包类型下不一致
+
+**状态：** 待修复  
+**优先级：** P1  
+**影响：** 正式包 UI 对齐问题
+
+**症状：**
+- 开发包和测试包左上角红绿灯（窗口控制按钮）位置一致
+- 打包成正式包后红绿灯会往下移
+- 导致与其他 UI 元素对不齐
+
+**可能原因：**
+- Tauri 打包后 titlebar 配置差异
+- macOS 窗口样式在 dev/production 构建中的行为不同
+- `tauri.conf.json` 中 window 配置可能需要区分环境
+
+**排查清单：**
+- [ ] 检查 `src-tauri/tauri.conf.json` 中 window 相关配置
+- [ ] 对比 dev 和 production 构建的 window 属性
+- [ ] 检查是否使用了自定义 titlebar 或 transparent 属性
+- [ ] 验证 macOS 特定的窗口样式设置
+
+**相关文件：**
+- `src-tauri/tauri.conf.json` — window 配置
+- `src-tauri/src/lib.rs` — 窗口创建逻辑
+
+---
+
+### BUG-004: 搜索大目录时内存占用过高且不释放
+
+**状态：** 待分析  
+**优先级：** P1  
+**影响：** 大目录搜索可能导致内存溢出
+
+**症状：**
+- 搜索大文件夹目录时内存增加约 2GB
+- 停止搜索后内存仍占用，不下降
+- 搜索小文件夹时内存没有明显增加
+
+**可能原因分析：**
+1. **BFS 全量收集**：`collect_entries_bfs` 将所有目录条目收集到 Vec 中
+2. **结果累积**：ScanStore 持续累积搜索结果，无上限
+3. **Rust 内存管理**：Rayon 线程池持有数据引用，阻止释放
+4. **前端状态**：Zustand store 持有大量结果对象引用
+
+**优化方向：**
+- 流式处理替代全量收集
+- 结果分页或虚拟滚动
+- 实现内存预算机制（超过阈值暂停收集）
+- 完成后主动清理 ScanStore
+- 前端结果列表虚拟化
+
+**排查清单：**
+- [ ] 使用 `heaptrack` 或 `valgrind` 分析 Rust 堆内存
+- [ ] 检查 `scanner.rs` 中 Vec 增长模式
+- [ ] 验证 `ChannelStore` 是否正确清理
+- [ ] 检查前端 `results` 数组大小增长
+- [ ] 测试停止搜索后的内存释放行为
+
+**相关文件：**
+- `src-tauri/src/scanner.rs` — collect_entries_bfs, search_directory
+- `src-tauri/src/commands/scan.rs` — cancel_scan, ChannelStore 管理
+- `src/store/index.ts` — results 状态管理
+
+---
+
 ## 🟡 优化清单
 
 ### OPT-001: 超长行预览卡死
