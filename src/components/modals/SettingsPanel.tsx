@@ -192,6 +192,38 @@ export function SettingsPanel() {
                     </select>
                   </div>
                 </div>
+                <h3 className={styles.sectionTitle}>文档内容提取</h3>
+                <p className={styles.sectionDescription}>
+                  启用后将在文档文件中提取文本内容进行搜索（默认开启）
+                </p>
+                {(["docx", "xlsx", "pdf", "pptx"] as const).map((format) => (
+                  <div className={styles.field} key={format}>
+                    <label className={styles.fieldLabel}>{format.toUpperCase()}</label>
+                    <div className={styles.fieldControl}>
+                      <label className={styles.toggle}>
+                        <input
+                          type="checkbox"
+                          checked={cfg.content_extraction[format]}
+                          onChange={(e) => {
+                            setCfg((prev) => ({
+                              ...prev,
+                              content_extraction: {
+                                ...prev.content_extraction,
+                                [format]: e.target.checked,
+                              },
+                            }));
+                          }}
+                        />
+                        <span className={styles.toggleTrack}>
+                          <span className={styles.toggleThumb} />
+                        </span>
+                        <span className={styles.toggleLabel}>
+                          {cfg.content_extraction[format] ? "已启用" : "已禁用"}
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
 
@@ -282,7 +314,7 @@ export function SettingsPanel() {
             {activeTab === "rules" && (
               <div className={styles.section}>
                 <h3 className={styles.sectionTitle}>跳过规则</h3>
-                <p className={styles.fieldHint} style={{ marginTop: -8, marginBottom: 12 }}>
+                <p className={styles.sectionDescription}>
                   匹配这些规则的目录将被跳过扫描
                 </p>
                 <div className={styles.rules}>
@@ -303,10 +335,10 @@ export function SettingsPanel() {
                   ))}
                 </div>
 
-                <h3 className={styles.sectionTitle} style={{ marginTop: 24 }}>
+                <h3 className={styles.sectionTitle}>
                   扫描规则
                 </h3>
-                <p className={styles.fieldHint} style={{ marginTop: -8, marginBottom: 12 }}>
+                <p className={styles.sectionDescription}>
                   匹配这些路径的目录将被自动允许扫描（在"记住我的选择"后自动添加）
                 </p>
                 <div className={styles.rules}>

@@ -9,6 +9,8 @@ pub struct AppConfig {
     pub scan: ScanSettings,
     #[serde(default)]
     pub display: DisplaySettings,
+    #[serde(default = "ContentExtractionSettings::default")]
+    pub content_extraction: ContentExtractionSettings,
     pub skip_rules: Vec<String>,
     pub scan_rules: Vec<String>,
 }
@@ -27,6 +29,22 @@ pub struct DisplaySettings {
     pub match_context_length: u32,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ContentExtractionSettings {
+    #[serde(default = "default_true")]
+    pub docx: bool,
+    #[serde(default = "default_true")]
+    pub xlsx: bool,
+    #[serde(default = "default_true")]
+    pub pdf: bool,
+    #[serde(default = "default_true")]
+    pub pptx: bool,
+}
+
+fn default_true() -> bool {
+    true
+}
+
 fn default_match_context_length() -> u32 {
     100
 }
@@ -37,6 +55,17 @@ impl Default for DisplaySettings {
             default_expand_count: 1,
             ocr_highlight_enabled: true,
             match_context_length: 100,
+        }
+    }
+}
+
+impl Default for ContentExtractionSettings {
+    fn default() -> Self {
+        ContentExtractionSettings {
+            docx: true,
+            xlsx: true,
+            pdf: true,
+            pptx: true,
         }
     }
 }
@@ -54,6 +83,7 @@ impl Default for AppConfig {
                 ocr_highlight_enabled: true,
                 match_context_length: 100,
             },
+            content_extraction: ContentExtractionSettings::default(),
             skip_rules: vec![
                 "node_modules".into(),
                 ".git".into(),
@@ -91,7 +121,13 @@ impl AppConfig {
         let path = Self::config_path(app_handle);
         if path.exists() {
             let content = fs::read_to_string(&path).unwrap_or_default();
-            serde_json::from_str(&content).unwrap_or_default()
+            let config: AppConfig = serde_json::from_str(&content).unwrap_or_default();
+            // Auto-migrate: if serde filled in new default fields, write back to keep file in sync
+            let current_content = serde_json::to_string_pretty(&config).unwrap_or_default();
+            if current_content != content {
+                let _ = config.save(app_handle);
+            }
+            config
         } else {
             let config = Self::default();
             let _ = config.save(app_handle);

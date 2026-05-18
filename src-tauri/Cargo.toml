@@ -34,4 +34,7 @@ uuid = { version = "1", features = ["v4"] }
 chrono = "0.4"
 kamadak-exif = "0.6"
 base64 = "0.22"
+zip = "2"
+quick-xml = "0.36"
+pdf-extract = "0.7"
 

@@ -108,6 +108,12 @@ export interface AppConfig {
     ocr_highlight_enabled: boolean;
     match_context_length: number;
   };
+  content_extraction: {
+    docx: boolean;
+    xlsx: boolean;
+    pdf: boolean;
+    pptx: boolean;
+  };
   skip_rules: string[];
   scan_rules: string[];
 }

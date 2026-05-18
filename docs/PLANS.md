@@ -59,6 +59,25 @@
 
 ---
 
+### 🟡 P1: 文档内容提取 [已完成]
+
+为 docx/xlsx/pptx/pdf 实现文档内容搜索，并设为可配置开关（默认开启）。
+
+**已完成：**
+- [x] 后端 config.rs: 新增 ContentExtractionSettings（docx/xlsx/pdf/pptx 开关）
+- [x] 后端 scanner.rs: 实现 extract_docx/xlsx/pptx/pdf_text，集成到 search_directory
+- [x] 后端 config.rs: 加载时自动迁移（serde default + 写回缺失字段）
+- [x] 后端 scanner.rs: pdf-extract panic 用 catch_unwind 兜底
+- [x] 前端 SettingsPanel: 扫描选项卡新增文档内容提取切换开关
+- [x] 前端 store: startScan 自动添加 "document_content" 到 scanTypes
+- [x] 前端 types: AppConfig 新增 content_extraction 字段
+- [x] 文件预览: 内容匹配的文档可预览提取文本（match_type !== filename 时显示预览按钮）
+- [x] SettingsPanel UI: 用 CSS 变量重写，保存按钮改为圆角矩形
+- [x] Cargo.toml: 新增 zip, quick-xml, pdf-extract 依赖
+- [x] docs/scan-flow.md: 同步更新
+
+---
+
 ### 🟢 P2: 功能完善 [待开始]
 
 - [ ] 确认面板添加"记住选择"选项

@@ -102,7 +102,7 @@ export const useStore = create<AppState>((set, get) => ({
     const extensions = getAllExtensions(settings.enabledPresets, settings.customExtensions);
     if (!settings.scanPath || !settings.keyword || extensions.length === 0) return;
 
-    const scanTypes = ["file_name", "text_content"];
+    const scanTypes = ["file_name", "text_content", "document_content"];
     if (settings.enabledPresets.includes("image")) {
       scanTypes.push("exif_data");
       if (settings.ocrEnabled) {

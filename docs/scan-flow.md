@@ -76,6 +76,7 @@ BFS 线程 ──> work_tx ──> work_rx ──> Dispatcher 线程 ──> Ray
 - 对目录下的每个直接文件执行匹配：
   - 文件名匹配（始终执行，不受扩展名过滤影响）
   - 文本内容匹配（仅限允许的扩展名）
+  - 文档内容匹配（docx/xlsx/pptx/pdf，受 AppConfig.content_extraction 控制）
   - EXIF 数据匹配（仅限图片扩展名）
   - OCR 文字识别（仅限 macOS + 图片扩展名）
 - 匹配结果通过 `result_tx` 发送
@@ -292,6 +293,7 @@ pub struct ScanResult {
 pub struct AppConfig {
     pub version: u32,
     pub scan: ScanSettings,
+    pub content_extraction: ContentExtractionSettings,
     pub skip_rules: Vec<String>,
     pub scan_rules: Vec<String>,
 }
@@ -299,6 +301,13 @@ pub struct AppConfig {
 pub struct ScanSettings {
     pub large_dir_threshold: u64,  // 默认 1000
     pub ask_on_large_dir: bool,    // 默认 true
+}
+
+pub struct ContentExtractionSettings {
+    pub docx: bool,   // 默认 true
+    pub xlsx: bool,   // 默认 true
+    pub pdf: bool,    // 默认 true
+    pub pptx: bool,   // 默认 true
 }
 ```
 
@@ -325,8 +334,20 @@ pub struct ScanSettings {
 | | `matches_rules()` | 规则匹配 |
 | | `is_text_file()` | 判断文本文件 |
 | | `is_image_file()` | 判断图片文件 |
+| | `is_document_file()` | 判断文档文件（docx/xlsx/pptx/pdf） |
+| | `extract_docx_text()` | 提取 docx 文本内容 |
+| | `extract_xlsx_text()` | 提取 xlsx 文本内容 |
+| | `extract_pptx_text()` | 提取 pptx 文本内容 |
+| | `extract_pdf_text()` | 提取 pdf 文本内容 |
+| | `extract_document_text()` | 文档文本提取路由函数 |
 | | `extract_exif()` | 提取 EXIF 数据 |
 | | `perform_ocr()` | OCR 识别 |
+| `src-tauri/src/commands/file_ops.rs` | `read_file_preview()` | 文件预览（通过 match_type 判断可预览性） |
+| | `read_text_content()` | 统一文本提取（纯文本 + 文档格式） |
+| | `move_to_trash()` | 移动到废纸篓 |
+| | `reveal_in_finder()` | 在 Finder 中显示 |
+| | `read_image_as_base64()` | 图片 base64 预览 |
+| | `get_file_info()` | 获取文件信息 |
 | `src-tauri/src/types.rs` | `DirWork` | 搜索工作项 |
 | | `ChannelStore` | 通道存储 |
 | | `ScanProgress` | 扫描进度 |

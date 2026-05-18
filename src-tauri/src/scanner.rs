@@ -12,6 +12,7 @@ use uuid::Uuid;
 use exif::Reader;
 
 use crate::types::{PendingConfirmation, SkippedDir, ScanConfig, DirWork};
+use crate::config::ContentExtractionSettings;
 
 fn extract_context(line: &str, keyword: &str, context_around: usize) -> String {
     let lower = line.to_lowercase();
@@ -81,6 +82,7 @@ struct ScanContext {
     threshold: u64,
     ask_on_large_dir: bool,
     context_around: usize,
+    content_extraction: ContentExtractionSettings,
 }
 
 // ─── Public entry point ───────────────────────────────────────────────────────
@@ -103,6 +105,7 @@ pub fn scan_directory(
         threshold: app_config.scan.large_dir_threshold,
         ask_on_large_dir: app_config.scan.ask_on_large_dir,
         context_around: app_config.display.match_context_length as usize,
+        content_extraction: app_config.content_extraction.clone(),
     });
 
     let (result_tx, result_rx) = mpsc::channel::<ScanResult>();
@@ -465,6 +468,39 @@ fn search_directory(
             }
         }
 
+        // 3.5. Document content matching (docx, xlsx, pptx, pdf)
+        if !matched && ext_allowed && ctx.scan_types.contains(&"document_content".to_string()) && is_document_file(&extension) {
+            let is_enabled = match extension.as_str() {
+                "docx" => ctx.content_extraction.docx,
+                "xlsx" => ctx.content_extraction.xlsx,
+                "pdf" => ctx.content_extraction.pdf,
+                "pptx" => ctx.content_extraction.pptx,
+                _ => false,
+            };
+            if is_enabled {
+                if let Ok(content) = extract_document_text(&path, &extension) {
+                    let content_lower = content.to_lowercase();
+                    if content_lower.contains(&ctx.keyword) {
+                        let context_line = content.lines()
+                            .find(|line| line.to_lowercase().contains(&ctx.keyword))
+                            .unwrap_or("");
+                        let _ = result_tx.send(ScanResult {
+                            file_path: path.to_string_lossy().to_string(),
+                            file_name: file_name.clone(),
+                            match_type: "content".to_string(),
+                            match_line: None,
+                            match_context: Some(extract_context(context_line, &ctx.keyword, ctx.context_around)),
+                            match_bboxes: None,
+                            file_size: metadata.len(),
+                            file_extension: extension.clone(),
+                            is_dir: false,
+                        });
+                        matched = true;
+                    }
+                }
+            }
+        }
+
         // 4. File name matching (lowest priority)
         if !matched && ext_allowed && ctx.scan_types.contains(&"file_name".to_string()) {
             if file_name.to_lowercase().contains(&ctx.keyword) {
@@ -521,7 +557,7 @@ fn count_entries_fast(path: &Path) -> u64 {
         .unwrap_or(0)
 }
 
-fn is_text_file(extension: &str) -> bool {
+pub fn is_text_file(extension: &str) -> bool {
     matches!(
         extension.to_lowercase().as_str(),
         "txt" | "md" | "csv" | "json" | "xml" | "yaml" | "yml" | "toml" |
@@ -537,6 +573,180 @@ fn is_image_file(extension: &str) -> bool {
         extension.to_lowercase().as_str(),
         "jpg" | "jpeg" | "png" | "gif" | "webp" | "bmp" | "tiff" | "tif" | "heic" | "heif"
     )
+}
+
+pub fn is_document_file(extension: &str) -> bool {
+    matches!(
+        extension.to_lowercase().as_str(),
+        "docx" | "xlsx" | "pptx" | "pdf"
+    )
+}
+
+fn extract_docx_text(path: &Path) -> Result<String, String> {
+    let file = fs::File::open(path).map_err(|e| e.to_string())?;
+    let mut archive = zip::ZipArchive::new(file).map_err(|e| e.to_string())?;
+    let mut doc = archive.by_name("word/document.xml").map_err(|e| e.to_string())?;
+    let mut contents = String::new();
+    use std::io::Read;
+    doc.read_to_string(&mut contents).map_err(|e| e.to_string())?;
+    let mut text = String::new();
+    let mut reader = quick_xml::Reader::from_str(&contents);
+    let mut buf = Vec::new();
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(quick_xml::events::Event::Start(ref e)) | Ok(quick_xml::events::Event::Empty(ref e)) => {
+                if e.local_name().as_ref() == b"t" {
+                    if let Ok(quick_xml::events::Event::Text(t)) = reader.read_event_into(&mut Vec::new()) {
+                        let s = t.unescape().unwrap_or_default();
+                        if !s.is_empty() {
+                            text.push_str(&s);
+                            text.push('\n');
+                        }
+                    }
+                }
+            }
+            Ok(quick_xml::events::Event::Eof) => break,
+            Err(_) => break,
+            _ => {}
+        }
+        buf.clear();
+    }
+    Ok(text)
+}
+
+fn extract_xlsx_text(path: &Path) -> Result<String, String> {
+    let file = fs::File::open(path).map_err(|e| e.to_string())?;
+    let mut archive = zip::ZipArchive::new(file).map_err(|e| e.to_string())?;
+    let mut shared_strings = Vec::new();
+    if let Ok(mut ss_file) = archive.by_name("xl/sharedStrings.xml") {
+        let mut contents = String::new();
+        use std::io::Read;
+        ss_file.read_to_string(&mut contents).map_err(|e| e.to_string())?;
+        let mut reader = quick_xml::Reader::from_str(&contents);
+        let mut buf = Vec::new();
+        loop {
+            match reader.read_event_into(&mut buf) {
+                Ok(quick_xml::events::Event::Start(ref e)) | Ok(quick_xml::events::Event::Empty(ref e)) => {
+                    if e.local_name().as_ref() == b"t" {
+                        if let Ok(quick_xml::events::Event::Text(t)) = reader.read_event_into(&mut Vec::new()) {
+                            shared_strings.push(t.unescape().unwrap_or_default().to_string());
+                        }
+                    }
+                }
+                Ok(quick_xml::events::Event::Eof) => break,
+                Err(_) => break,
+                _ => {}
+            }
+            buf.clear();
+        }
+    }
+    let mut sheet_names: Vec<String> = Vec::new();
+    for i in 0..archive.len() {
+        if let Ok(name) = archive.by_index(i) {
+            let n = name.name().to_string();
+            if n.starts_with("xl/worksheets/sheet") && n.ends_with(".xml") {
+                sheet_names.push(n);
+            }
+        }
+    }
+    let mut text = String::new();
+    for sheet_name in sheet_names {
+        if let Ok(mut sheet_file) = archive.by_name(&sheet_name) {
+            let mut contents = String::new();
+            use std::io::Read;
+            sheet_file.read_to_string(&mut contents).map_err(|e| e.to_string())?;
+            let mut reader = quick_xml::Reader::from_str(&contents);
+            let mut buf = Vec::new();
+            loop {
+                match reader.read_event_into(&mut buf) {
+                    Ok(quick_xml::events::Event::Start(ref e)) | Ok(quick_xml::events::Event::Empty(ref e)) => {
+                        if e.local_name().as_ref() == b"v" {
+                            if let Ok(quick_xml::events::Event::Text(t)) = reader.read_event_into(&mut Vec::new()) {
+                                let val = t.unescape().unwrap_or_default().to_string();
+                                if let Ok(idx) = val.parse::<usize>() {
+                                    if let Some(s) = shared_strings.get(idx) {
+                                        text.push_str(s);
+                                        text.push('\n');
+                                    }
+                                } else {
+                                    text.push_str(&val);
+                                    text.push('\n');
+                                }
+                            }
+                        }
+                    }
+                    Ok(quick_xml::events::Event::Eof) => break,
+                    Err(_) => break,
+                    _ => {}
+                }
+                buf.clear();
+            }
+        }
+    }
+    Ok(text)
+}
+
+fn extract_pptx_text(path: &Path) -> Result<String, String> {
+    let file = fs::File::open(path).map_err(|e| e.to_string())?;
+    let mut archive = zip::ZipArchive::new(file).map_err(|e| e.to_string())?;
+    let mut slide_names: Vec<String> = Vec::new();
+    for i in 0..archive.len() {
+        if let Ok(entry) = archive.by_index(i) {
+            let n = entry.name().to_string();
+            if n.starts_with("ppt/slides/slide") && n.ends_with(".xml") {
+                slide_names.push(n);
+            }
+        }
+    }
+    let mut text = String::new();
+    for slide_name in slide_names {
+        if let Ok(mut slide_file) = archive.by_name(&slide_name) {
+            let mut contents = String::new();
+            use std::io::Read;
+            slide_file.read_to_string(&mut contents).map_err(|e| e.to_string())?;
+            let mut reader = quick_xml::Reader::from_str(&contents);
+            let mut buf = Vec::new();
+            loop {
+                match reader.read_event_into(&mut buf) {
+                    Ok(quick_xml::events::Event::Start(ref e)) | Ok(quick_xml::events::Event::Empty(ref e)) => {
+                        if e.local_name().as_ref() == b"t" {
+                            if let Ok(quick_xml::events::Event::Text(t)) = reader.read_event_into(&mut Vec::new()) {
+                                let s = t.unescape().unwrap_or_default();
+                                if !s.is_empty() {
+                                    text.push_str(&s);
+                                    text.push('\n');
+                                }
+                            }
+                        }
+                    }
+                    Ok(quick_xml::events::Event::Eof) => break,
+                    Err(_) => break,
+                    _ => {}
+                }
+                buf.clear();
+            }
+        }
+    }
+    Ok(text)
+}
+
+fn extract_pdf_text(path: &Path) -> Result<String, String> {
+    let path = path.to_path_buf();
+    std::panic::catch_unwind(move || {
+        pdf_extract::extract_text(&path)
+    })
+    .map_err(|_| "PDF extraction panicked (unsupported encoding)".to_string())?
+    .map_err(|e| e.to_string())
+}
+
+pub fn extract_document_text(path: &Path, extension: &str) -> Result<String, String> {
+    match extension {
+        "docx" => extract_docx_text(path),
+        "xlsx" => extract_xlsx_text(path),
+        "pptx" => extract_pptx_text(path),
+        "pdf" => extract_pdf_text(path),
+        _ => Err("Unsupported document type".to_string()),
+    }
 }
 
 fn extract_exif(path: &Path) -> Result<String, String> {

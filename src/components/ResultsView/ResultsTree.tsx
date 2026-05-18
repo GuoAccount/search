@@ -136,6 +136,7 @@ export function ResultsTree() {
       const preview = await invoke<any>("read_file_preview", {
         filePath: result.file_path,
         matchLine: result.match_line,
+        matchType: result.match_type,
         contextLines: 5,
         keyword: settings.keyword,
         contextLength: appConfig?.display?.match_context_length || 100,
@@ -236,7 +237,7 @@ export function ResultsTree() {
               )}
             </>
           )}
-          {node.result && (
+          {node.result && node.result.match_type !== "filename" && (
             <button
               className={styles.preview}
               onClick={(e) => {
@@ -313,15 +314,17 @@ export function ResultsTree() {
                   {highlightText(result.match_context.substring(0, 80), settings.keyword)}
                 </span>
               )}
-              <button
-                className={styles.preview}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handlePreviewFile(result);
-                }}
-              >
-                <Eye size={12} />
-              </button>
+              {result.match_type !== "filename" && (
+                <button
+                  className={styles.preview}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handlePreviewFile(result);
+                  }}
+                >
+                  <Eye size={12} />
+                </button>
+              )}
             </div>
           );
         })}
