@@ -7,7 +7,7 @@ export const DEFAULT_PRESETS: Record<string, FileTypePreset> = {
   document: {
     label: "文档",
     icon: FileText,
-    extensions: ["txt", "md", "csv", "json", "xml", "yaml", "yml", "toml", "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx"],
+    extensions: ["txt", "md", "csv", "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx"],
   },
   code: {
     label: "代码",

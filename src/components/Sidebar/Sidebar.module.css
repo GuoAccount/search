@@ -28,6 +28,12 @@
   flex: 1;
   overflow-y: auto;
   padding: var(--space-3);
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.scroll::-webkit-scrollbar {
+  display: none;
 }
 
 .footer {
