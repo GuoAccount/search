@@ -32,12 +32,17 @@
 - **Multi-mode search** — Search by file name, text content, EXIF metadata, or OCR (macOS)
 - **File type presets** — Quick filter by Document, Code, Image, or Config categories
 - **Tree view** — Hierarchical folder tree with expand/collapse navigation
-- **File preview** — In-app preview for text, code, and image files
+- **File preview** — In-app preview for text, code, and image files with context highlighting
+- **OCR highlight** — Visual bounding box overlay on OCR-matched images
 - **Batch management** — Select and move multiple files to trash with one click
-- **Native performance** — Rust-powered search engine with multi-threaded scanning
+- **Native performance** — BFS + Rayon thread pool for concurrent scanning, real-time result streaming
+- **Large directory handling** — Confirmation dialog for directories exceeding threshold, with "remember" rules
+- **Skipped directories log** — Review which directories were skipped and why
+- **Persistent settings** — Large dir threshold, scan/skip rules, display preferences, saved across sessions
 - **Theme support** — Light, Dark, and System theme modes
 - **Keyboard shortcuts** — `Cmd/Ctrl+B` toggle sidebar, `Cmd/Ctrl+Enter` start scan
-- **Sidebar layout** — Collapsible sidebar with file type configuration
+- **Sidebar layout** — Collapsible sidebar with file type presets, scan path, and OCR toggle
+- **Settings panel** — Configure scan threshold, display options, and file type extension rules
 - **Reveal in Finder** — Open file location directly in system file manager
 - **Cross-platform** — Runs on macOS, Windows, and Linux
 
@@ -89,10 +94,21 @@ Download the latest installer for your platform from [GitHub Releases](https://g
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | React 19, TypeScript, Vite 7, Lucide Icons |
-| Backend | Rust, Tauri 2, Walkdir, Rayon, Kamadak-exif |
+| Frontend | React 19, TypeScript, Vite 7, Zustand 5, Lucide Icons |
+| Backend | Rust, Tauri 2, Walkdir, Rayon, Kamadak-exif, Trash |
 | Build | pnpm, tauri-cli |
 | CI/CD | GitHub Actions |
+
+## Search Engine Architecture
+
+The scan engine uses a concurrent **BFS + Rayon thread pool** design:
+
+1. **BFS thread** traverses the directory tree, classifying directories by size
+2. **Dispatcher thread** feeds work items from a channel into the Rayon thread pool
+3. **Rayon thread pool** (CPU-bound) performs file matching in parallel — filename, text content, EXIF, and OCR
+4. **Result/Progress handler thread** streams results back to the frontend in real-time
+
+Large directories (>1000 entries by default) trigger a confirmation dialog before scanning, with an optional "remember" rule system.
 
 ## Keyboard Shortcuts
 
@@ -106,19 +122,53 @@ Download the latest installer for your platform from [GitHub Releases](https://g
 
 ```
 search/
-├── src/                    # React frontend
-│   ├── App.tsx             # Main application component
-│   ├── App.css             # Application styles
-│   └── index.css           # Theme variables and base styles
-├── src-tauri/              # Rust backend
+├── src/                          # React frontend
+│   ├── App.tsx                   # Main application component
+│   ├── App.css                   # Application styles
+│   ├── index.css                 # Theme variables and base styles
+│   ├── main.tsx                  # React entry point
+│   ├── components/
+│   │   ├── Sidebar/              # Collapsible sidebar with presets
+│   │   ├── SearchBar/            # Search input and scan controls
+│   │   ├── ResultsView/          # Tree view with file results
+│   │   ├── ScanProgress/         # Scan progress indicator
+│   │   ├── PresetSelector/       # File type preset configuration
+│   │   ├── EmptyState/           # Empty state placeholder
+│   │   └── modals/
+│   │       ├── ConfirmPanel.tsx   # Large directory confirmation dialog
+│   │       ├── SkippedDirsPanel.tsx # Skipped directories review
+│   │       ├── SettingsPanel.tsx  # Application settings
+│   │       ├── FilePreviewModal.tsx # Text/code file preview
+│   │       └── ImagePreviewModal.tsx # Image preview with OCR highlights
+│   ├── store/
+│   │   └── index.ts              # Zustand state management
+│   ├── types/
+│   │   └── index.ts              # TypeScript type definitions
+│   ├── constants/
+│   │   └── presets.ts            # File type presets configuration
+│   ├── utils/
+│   │   ├── storage.ts            # Settings persistence
+│   │   └── file.ts               # File utility functions
+│   └── assets/                   # Static assets
+├── src-tauri/                    # Rust backend
 │   ├── src/
-│   │   ├── lib.rs          # Tauri commands and app entry
-│   │   └── scanner.rs      # File scanning engine
-│   ├── resources/          # OCR scripts, sounds, etc.
-│   ├── Cargo.toml          # Rust dependencies
-│   └── tauri.conf.json     # Tauri configuration
-├── .github/workflows/      # CI/CD release pipeline
-├── DESIGN.md               # Apple-style design system documentation
+│   │   ├── lib.rs                # Tauri builder, plugin setup, command registration
+│   │   ├── main.rs               # Application entry point
+│   │   ├── types.rs              # Shared data structures
+│   │   ├── config.rs             # Persistent configuration management
+│   │   ├── scanner.rs            # File scanning engine (BFS + Rayon)
+│   │   └── commands/
+│   │       ├── mod.rs            # Command module declarations
+│   │       ├── scan.rs           # Scan lifecycle commands
+│   │       ├── file_ops.rs       # File operations (preview, trash, reveal)
+│   │       └── system.rs         # System commands (sound, config file)
+│   ├── resources/                # OCR scripts, sounds, etc.
+│   ├── Cargo.toml                # Rust dependencies
+│   └── tauri.conf.json           # Tauri configuration
+├── docs/                         # Architecture and product documentation
+├── .github/workflows/            # CI/CD release pipeline
+├── DESIGN.md                     # Apple-style design system documentation
+├── ARCHITECTURE.md               # System architecture overview
 ├── package.json
 └── vite.config.ts
 ```
