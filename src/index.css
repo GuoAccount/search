@@ -55,7 +55,7 @@
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
   --shadow-md: 0 4px 14px rgba(0,0,0,0.08);
   --shadow-sheet: 0 24px 80px rgba(0,0,0,0.14);
-  --shadow-sidebar: -4px 0 12px rgba(0, 0, 0, 0.04), -1px 0 4px rgba(0, 0, 0, 0.02);
+  --shadow-sidebar: 4px 0 12px rgba(0, 0, 0, 0.04), 1px 0 4px rgba(0, 0, 0, 0.02);
   --border-sidebar: -1px 0 0 rgba(0, 0, 0, 0.1);
   --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.06), 0 1px 4px rgba(0, 0, 0, 0.04);
 
@@ -113,10 +113,10 @@
   --color-fill-secondary: rgba(255, 255, 255, 0.05);
   --color-fill-tertiary: rgba(255, 255, 255, 0.03);
 
-  --color-window-bg: #1C1C1E;
+  --color-window-bg: #2C2C2E;
   --color-content-bg: #111113;
   --color-surface-bg: #17171A;
-  --color-sidebar-bg: #1C1C1E;
+  --color-sidebar-bg: #2C2C2E;
   --color-header-bg: rgba(28, 28, 30, 0.6);
   --color-selected: rgba(10, 132, 255, 0.18);
   --color-hover: rgba(255, 255, 255, 0.04);
@@ -125,7 +125,7 @@
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.4);
   --shadow-md: 0 4px 14px rgba(0,0,0,0.5);
   --shadow-sheet: 0 24px 80px rgba(0,0,0,0.7);
-  --shadow-sidebar: -6px 0 16px rgba(0, 0, 0, 0.3), -2px 0 6px rgba(0, 0, 0, 0.2);
+    --shadow-sidebar: 6px 0 16px rgba(0, 0, 0, 0.3), 2px 0 6px rgba(0, 0, 0, 0.2);
   --border-sidebar: -1px 0 0 rgba(255, 255, 255, 0.08);
   --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.3), 0 1px 4px rgba(0, 0, 0, 0.15);
 
@@ -172,10 +172,10 @@
     --color-fill-secondary: rgba(255, 255, 255, 0.05);
     --color-fill-tertiary: rgba(255, 255, 255, 0.03);
 
-    --color-window-bg: #1C1C1E;
+    --color-window-bg: #2C2C2E;
     --color-content-bg: #111113;
     --color-surface-bg: #17171A;
-    --color-sidebar-bg: #1C1C1E;
+    --color-sidebar-bg: #2C2C2E;
     --color-header-bg: rgba(28, 28, 30, 0.6);
     --color-selected: rgba(10, 132, 255, 0.18);
     --color-hover: rgba(255, 255, 255, 0.04);
@@ -184,7 +184,7 @@
     --shadow-sm: 0 1px 3px rgba(0,0,0,0.4);
     --shadow-md: 0 4px 14px rgba(0,0,0,0.5);
     --shadow-sheet: 0 24px 80px rgba(0,0,0,0.7);
-    --shadow-sidebar: -6px 0 16px rgba(0, 0, 0, 0.3), -2px 0 6px rgba(0, 0, 0, 0.2);
+  --shadow-sidebar: 6px 0 16px rgba(0, 0, 0, 0.3), 2px 0 6px rgba(0, 0, 0, 0.2);
     --border-sidebar: -1px 0 0 rgba(255, 255, 255, 0.08);
     --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.3), 0 1px 4px rgba(0, 0, 0, 0.15);
 
