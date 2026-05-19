@@ -52,6 +52,7 @@
 - [x] 格式计数修复
 - [x] 扩展名筛选bug（文件名匹配未检查 ext_allowed）
 - [x] 删除文件复活bug（move_to_trash 未清理 ScanStore）
+- [x] macOS红绿灯位置不一致（BUG-003）
 
 **待验证：**
 - [ ] 大目录确认流程
@@ -88,15 +89,17 @@
 
 ---
 
-### 🟡 P1: UI 与内存优化 [待开始]
+### 🟡 P1: UI 与内存优化 [进行中]
 
 **目标：** 修复两个用户反馈的 bug，提升应用稳定性
 
-#### 阶段一：macOS 红绿灯位置修复 (BUG-003)
-- [ ] 分析 dev vs production 构建的 window 配置差异
-- [ ] 检查 `tauri.conf.json` 中 titlebar 相关设置
-- [ ] 实现环境感知的窗口配置
-- [ ] 验证修复：对比开发包、测试包、正式包
+#### 阶段一：macOS 红绿灯位置修复 (BUG-003) [已完成]
+- [x] 分析 dev vs production 构建的 window 配置差异
+- [x] 检查 `tauri.conf.json` 中 titlebar 相关设置
+- [x] 检查 tauri-action 版本和构建参数
+- [x] 对比本地构建和 GitHub Actions 构建的差异
+- [x] 修改 GitHub Actions 构建配置
+- [x] 验证修复：对比开发包、测试包、正式包
 
 #### 阶段二：内存优化 (BUG-004)
 - [ ] 使用内存分析工具定位热点

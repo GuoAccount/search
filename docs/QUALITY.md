@@ -41,7 +41,7 @@
 
 ### BUG-003: macOS 红绿灯位置在不同包类型下不一致
 
-**状态：** 待修复  
+**状态：** 已修复  
 **优先级：** P1  
 **影响：** 正式包 UI 对齐问题
 
@@ -50,20 +50,41 @@
 - 打包成正式包后红绿灯会往下移
 - 导致与其他 UI 元素对不齐
 
-**可能原因：**
-- Tauri 打包后 titlebar 配置差异
-- macOS 窗口样式在 dev/production 构建中的行为不同
-- `tauri.conf.json` 中 window 配置可能需要区分环境
+**根本原因：**
+- GitHub Actions 自动构建环境与本地构建环境差异
+- 本地 `pnpm tauri build --bundles dmg` 构建正常
+- GitHub Actions 使用 `tauri-apps/tauri-action@action-v0.6.2` 构建异常
+- 可能是 tauri-action 版本或构建参数导致的窗口配置差异
+
+**修复方案：**
+- 参考 Tauri 2.0 官方文档的 GitHub Actions 配置
+- 使用 `tauri-apps/tauri-action@v0` 替代 `action-v0.6.2`
+- 简化配置，移除不必要的参数，使用官方推荐的 tagName/releaseName 配置
+- 使用 `permissions: write-all` 修复 release 创建权限问题
+- 使用 `ncipollo/release-action` 替代 `tauri-action` 创建 release
 
 **排查清单：**
-- [ ] 检查 `src-tauri/tauri.conf.json` 中 window 相关配置
-- [ ] 对比 dev 和 production 构建的 window 属性
-- [ ] 检查是否使用了自定义 titlebar 或 transparent 属性
-- [ ] 验证 macOS 特定的窗口样式设置
+- [x] 检查 `src-tauri/tauri.conf.json` 中 window 相关配置
+- [x] 对比 dev 和 production 构建的 window 属性
+- [x] 检查是否使用了自定义 titlebar 或 transparent 属性
+- [x] 验证 macOS 特定的窗口样式设置
+- [x] 检查 tauri-action 版本和构建参数
+- [x] 对比本地构建和 GitHub Actions 构建的差异
+- [x] 修改 GitHub Actions 构建配置
+- [x] 参考 Tauri 2.0 官方文档配置
+- [x] 修复 tagName 配置，使用 github.ref_name
+- [x] 添加 actions:write 权限修复 release 创建权限问题
+- [x] 添加更多权限（issues:write, pull-requests:write, discussions:write）
+- [x] 使用 softprops/action-gh-release 替代 tauri-action 创建 release
+- [x] 参考其他 Tauri 2.0 项目配置（clash-verge-rev）
+- [x] 使用 permissions:write-all 和 tauriScript:pnpm
+- [x] 移除 tauriScript:pnpm，使用默认的 pnpm tauri 命令
+- [x] 使用 ncipollo/release-action 替代 tauri-action 创建 release
 
 **相关文件：**
 - `src-tauri/tauri.conf.json` — window 配置
 - `src-tauri/src/lib.rs` — 窗口创建逻辑
+- `.github/workflows/release.yml` — GitHub Actions 构建配置
 
 ---
 
