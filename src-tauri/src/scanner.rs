@@ -55,6 +55,7 @@ pub struct ScanResult {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct OCRRegion {
     text: String,
     x: f64,
@@ -763,6 +764,7 @@ fn extract_exif(path: &Path) -> Result<String, String> {
     Ok(exif_data.join("; "))
 }
 
+#[allow(dead_code)]
 fn perform_ocr(path: &Path) -> Result<Vec<OCRRegion>, String> {
     let script = include_str!("../resources/ocr.swift");
     let temp_dir = std::env::temp_dir();
