@@ -39,7 +39,7 @@
 
 ---
 
-### 🟡 P1: Bug修复冲刺 [进行中]
+### 🟡 P1: Bug修复冲刺 [已完成]
 
 修复用户报告的多个关键bug。
 
@@ -53,10 +53,8 @@
 - [x] 扩展名筛选bug（文件名匹配未检查 ext_allowed）
 - [x] 删除文件复活bug（move_to_trash 未清理 ScanStore）
 - [x] macOS红绿灯位置不一致（BUG-003）
-
-**待验证：**
-- [ ] 大目录确认流程
-- [ ] OCR搜索图片文字功能
+- [x] 大目录确认流程（scan_rules 匹配后仍触发确认的 bug）
+- [x] PDF 提取 panic 导致应用崩溃（catch_unwind + rayon 层保护）
 
 ---
 
@@ -79,9 +77,9 @@
 
 ---
 
-### 🟢 P2: 功能完善 [待开始]
+### 🟢 P2: 功能完善 [进行中]
 
-- [ ] 确认面板添加"记住选择"选项
+- [x] 确认面板添加"记住选择"选项（toggle 开关 + skip_rules/scan_rules 写入）
 - [ ] 批量确认接口优化
 - [ ] 扫描状态持久化
 - [ ] 子扫描级联取消
@@ -104,6 +102,35 @@
 
 ---
 
+### 🟡 P1: Scanner 模块化重构 [已完成]
+
+**目标：** 将 792 行的 scanner.rs 拆分为职责单一的模块
+
+**已完成：**
+- [x] scanner/context.rs — 数据结构（ScanResult, ScanCallback, ScanContext）
+- [x] scanner/bfs.rs — BFS 目录遍历
+- [x] scanner/worker.rs — 文件搜索 worker
+- [x] scanner/document.rs — 文档文本提取（docx/xlsx/pptx/pdf）
+- [x] scanner/helpers.rs — 路径工具函数
+- [x] scanner/matchers.rs — EXIF 提取
+- [x] scanner/mod.rs — 外观模式统一入口
+
+---
+
+### 🟡 P1: 设置面板与确认面板 UI 优化 [已完成]
+
+**已完成：**
+- [x] 设置面板：左侧分类点击定位 + 右侧无限滚动 + 滚动高亮联动
+- [x] 设置面板：对话框尺寸改为窗口比例（min(720px, 70vw) x min(560px, 75vh)）
+- [x] 设置面板：背景遮罩减淡（rgba 0.5 → 0.25）
+- [x] 设置面板：跳过规则/扫描规则添加输入框
+- [x] 设置面板：修复滚动到底部不切换规则 tab
+- [x] 确认面板：记住选项 toggle 开关（替代 checkbox）
+- [x] 确认面板：路径过长自动滚动展示
+- [x] 确认面板：背景遮罩减淡
+
+---
+
 ### 🟡 P1: UI 与内存优化 [进行中]
 
 **目标：** 修复两个用户反馈的 bug，提升应用稳定性
@@ -120,7 +147,7 @@
 - [ ] 使用内存分析工具定位热点
 - [ ] 实现流式 BFS 替代全量收集
 - [ ] 添加内存预算机制（阈值暂停）
-- [ ] 实现结果列表虚拟化
+- [x] 实现结果列表虚拟化（@tanstack/react-virtual）
 - [ ] 完成后主动清理 ScanStore
 - [ ] 验证修复：大目录搜索内存稳定 + 停止后释放
 

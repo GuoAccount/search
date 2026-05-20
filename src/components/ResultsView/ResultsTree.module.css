@@ -4,6 +4,19 @@
   border: 0.5px solid var(--color-separator);
   border-radius: var(--radius-md);
   background: var(--color-content-bg);
+  contain: strict;
+}
+
+.virtualInner {
+  position: relative;
+  width: 100%;
+}
+
+.virtualItem {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
 }
 
 .item {

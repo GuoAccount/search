@@ -1,7 +1,7 @@
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.25);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -112,12 +112,14 @@
   font-size: 13px;
   color: var(--color-label);
   margin-bottom: 4px;
+  overflow: hidden;
+  position: relative;
 }
 
 .itemPath span {
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
+  flex-shrink: 0;
+  will-change: transform;
 }
 
 .itemCount {
@@ -130,14 +132,17 @@
   align-items: center;
   gap: 8px;
   margin-left: 12px;
+  flex-shrink: 0;
 }
 
 .allow,
 .deny {
-  padding: 6px 12px;
+  padding: 6px 14px;
   border-radius: var(--radius-sm);
   font-size: 12px;
   font-weight: 500;
+  white-space: nowrap;
+  transition: all 0.15s var(--ease-out);
 }
 
 .allow {
@@ -157,4 +162,59 @@
 .deny:hover {
   background: var(--color-hover);
   color: var(--color-label);
+}
+
+.divider {
+  width: 1px;
+  height: 20px;
+  background: var(--color-separator);
+  flex-shrink: 0;
+}
+
+.rememberToggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.toggleTrack {
+  position: relative;
+  width: 28px;
+  height: 16px;
+  border-radius: 8px;
+  background: var(--color-fill);
+  cursor: pointer;
+  transition: background 0.2s var(--ease-out);
+  flex-shrink: 0;
+}
+
+.toggleTrack[data-on="true"] {
+  background: var(--color-blue);
+}
+
+.toggleThumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  transition: transform 0.2s var(--ease-spring);
+}
+
+.toggleTrack[data-on="true"] .toggleThumb {
+  transform: translateX(12px);
+}
+
+.toggleLabel {
+  font-family: var(--font-system);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--color-tertiary-label);
+  white-space: nowrap;
+  width: 24px;
+  user-select: none;
 }

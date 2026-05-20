@@ -37,8 +37,9 @@
 │  │  scan.rs    │ file_ops.rs │ system.rs               │ │
 │  └─────────────────────────────────────────────────────┘ │
 │  ┌─────────────────────────────────────────────────────┐ │
-│  │              scanner.rs (扫描引擎)                    │ │
-│  │  BFS 线程 → work_tx → Rayon 线程池 → 结果实时返回    │ │
+│  │              scanner/ (扫描引擎)                      │ │
+│  │  mod.rs (外观) │ bfs.rs (遍历) │ worker.rs (搜索)     │ │
+│  │  context.rs (数据) │ document.rs (文档) │ helpers.rs   │ │
 │  └─────────────────────────────────────────────────────┘ │
 │  ┌─────────────────────────────────────────────────────┐ │
 │  │              ocr/ (OCR 跨平台抽象)                    │ │
@@ -61,7 +62,7 @@ Types → Config → OCR → Scanner → Commands → Store → UI
 | **Types** | 共享数据结构 | `src-tauri/src/types.rs` + `src/types/` |
 | **Config** | 应用配置持久化 | `src-tauri/src/config.rs` |
 | **OCR** | OCR 跨平台抽象 | `src-tauri/src/ocr/` (trait + macOS Vision + API) |
-| **Scanner** | 文件扫描、匹配算法 | `src-tauri/src/scanner.rs` |
+| **Scanner** | 文件扫描、匹配算法 | `src-tauri/src/scanner/` (mod/bfs/worker/document/helpers/matchers/context) |
 | **Commands** | Tauri IPC 命令处理 | `src-tauri/src/commands/` |
 | **Store** | 全局状态管理、业务逻辑 | `src/store/index.ts` |
 | **UI** | 组件渲染、用户交互 | `src/components/` |
@@ -114,6 +115,9 @@ BFS 遇到大目录 → count_entries_fast() > threshold
   - 使用 `tauri-plugin-log` 添加日志系统 + panic hook
   - OCR 跨平台抽象（trait + macOS Vision + 第三方 API）
   - 系统音频播放全平台支持
+- 2026-05-20: Scanner 模块化重构（792 行 → 7 个模块，外观模式）
+- 2026-05-20: 搜索结果列表虚拟化（@tanstack/react-virtual）
+- 2026-05-20: 设置面板/确认面板 UI 优化（滚动定位、记住选项、路径自动滚动）
 - 技术债：dispatch线程使用recv_timeout轮询，未来可考虑事件驱动
 
 ## 变更检查

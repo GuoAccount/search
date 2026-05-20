@@ -1,4 +1,5 @@
-import { useEffect, useRef, ReactNode } from "react";
+import { useEffect, useRef, useMemo, useCallback, ReactNode } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { useStore } from "../../store";
 import { buildTree, getFileDir } from "../../utils/file";
 import { getFileCategory } from "../../utils/file";
@@ -14,6 +15,8 @@ import {
   Search,
 } from "lucide-react";
 import styles from "./ResultsTree.module.css";
+
+const ITEM_HEIGHT = 36;
 
 function getParentDirs(filePath: string): string[] {
   const dirs: string[] = [];
@@ -44,6 +47,23 @@ function highlightText(text: string, keyword: string): ReactNode {
   );
 }
 
+interface FlatNode {
+  node: any;
+  depth: number;
+  isFlat: boolean;
+}
+
+function flattenTree(nodes: any[], depth: number, expandedFolders: Set<string>): FlatNode[] {
+  const result: FlatNode[] = [];
+  for (const node of nodes) {
+    result.push({ node, depth, isFlat: false });
+    if (node.isDir && expandedFolders.has(node.path) && node.children) {
+      result.push(...flattenTree(node.children, depth + 1, expandedFolders));
+    }
+  }
+  return result;
+}
+
 export function ResultsTree() {
   const {
     settings,
@@ -58,6 +78,7 @@ export function ResultsTree() {
     appConfig,
   } = useStore();
 
+  const parentRef = useRef<HTMLDivElement>(null);
   const lastAutoExpandLen = useRef(0);
 
   useEffect(() => {
@@ -86,33 +107,48 @@ export function ResultsTree() {
     setExpandedFolders(toExpand);
   }, [scanProgress?.results.length, activeTab, appConfig?.display?.default_expand_count]);
 
-  if (!scanProgress) return null;
+  const isFlatMode = activeTab !== "all";
 
-  const filteredResults = scanProgress.results.filter((result) => {
-    if (activeTab === "all") return true;
-    return getFileCategory(result.file_extension) === activeTab;
+  const flatItems = useMemo<FlatNode[]>(() => {
+    if (!scanProgress) return [];
+
+    const filteredResults = scanProgress.results.filter((result) => {
+      if (isFlatMode) return getFileCategory(result.file_extension) === activeTab;
+      return true;
+    });
+
+    if (isFlatMode) {
+      return filteredResults.map((r) => ({ node: r, depth: 0, isFlat: true }));
+    }
+
+    const tree = buildTree(filteredResults);
+    return flattenTree(tree.children, 0, expandedFolders);
+  }, [scanProgress, isFlatMode, activeTab, expandedFolders]);
+
+  const virtualizer = useVirtualizer({
+    count: flatItems.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => ITEM_HEIGHT,
+    overscan: 10,
   });
 
-  const isFlatMode = activeTab !== "all";
-  const tree = isFlatMode ? null : buildTree(filteredResults);
-
-  const handleToggleFolder = (path: string) => {
+  const handleToggleFolder = useCallback((path: string) => {
     setExpandedFolders((prev) => {
       const next = new Set(prev);
       next.has(path) ? next.delete(path) : next.add(path);
       return next;
     });
-  };
+  }, [setExpandedFolders]);
 
-  const handleToggleSelect = (filePath: string) => {
+  const handleToggleSelect = useCallback((filePath: string) => {
     setSelectedResults((prev) => {
       const next = new Set(prev);
       next.has(filePath) ? next.delete(filePath) : next.add(filePath);
       return next;
     });
-  };
+  }, [setSelectedResults]);
 
-  const handlePreviewFile = async (result: any) => {
+  const handlePreviewFile = useCallback(async (result: any) => {
     if (result.is_dir) {
       handleToggleFolder(result.file_path);
       return;
@@ -145,18 +181,18 @@ export function ResultsTree() {
     } catch (err) {
       console.error("Failed to read file:", err);
     }
-  };
+  }, [handleToggleFolder, settings.keyword, appConfig, setPreviewFile, setPreviewImage]);
 
-  const handleRevealInFinder = async (filePath: string) => {
+  const handleRevealInFinder = useCallback(async (filePath: string) => {
     try {
       const { invoke } = await import("@tauri-apps/api/core");
       await invoke("reveal_in_finder", { filePath });
     } catch (err) {
       console.error("Failed to reveal in finder:", err);
     }
-  };
+  }, []);
 
-  const getFileIcon = (extension: string, isDir: boolean) => {
+  const getFileIcon = useCallback((extension: string, isDir: boolean) => {
     if (isDir) {
       return expandedFolders.has(extension) ? (
         <FolderOpen size={14} />
@@ -177,162 +213,142 @@ export function ResultsTree() {
       default:
         return <File size={14} />;
     }
-  };
+  }, [expandedFolders]);
 
-  const renderNode = (node: any, depth: number = 0) => {
-    const isExpanded = expandedFolders.has(node.path);
-    const isSelected = node.result
-      ? selectedResults.has(node.result.file_path)
-      : false;
+  const renderItem = useCallback((flatNode: FlatNode) => {
+    const { node, depth, isFlat } = flatNode;
 
-    return (
-      <div key={node.path}>
+    if (isFlat) {
+      const result = node;
+      const isSelected = selectedResults.has(result.file_path);
+      return (
         <div
           className={`${styles.item} ${isSelected ? styles.selected : ""}`}
-          style={{ paddingLeft: `${depth * 16 + 8}px` }}
-          onClick={() => {
-            if (node.isDir) {
-              handleToggleFolder(node.path);
-            } else if (node.result) {
-              handleToggleSelect(node.result.file_path);
-            }
-          }}
+          style={{ paddingLeft: "8px" }}
+          onClick={() => handleToggleSelect(result.file_path)}
         >
           <div className={styles.icon}>
-            {getFileIcon(node.isDir ? node.path : node.name, node.isDir)}
+            {getFileIcon(result.file_extension, false)}
           </div>
           <div className={styles.fileInfo}>
-            <span className={styles.name}>{node.name}</span>
-            {node.result && (
-              <div className={styles.pathRow}>
-                <span className={styles.path}>{getFileDir(node.result.file_path)}</span>
-                <button
-                  className={styles.revealBtn}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleRevealInFinder(node.result.file_path);
-                  }}
-                  title="在 Finder 中显示"
-                >
-                  <Search size={10} />
-                </button>
-              </div>
-            )}
+            <span className={styles.name}>{result.file_name}</span>
+            <div className={styles.pathRow}>
+              <span className={styles.path}>{getFileDir(result.file_path)}</span>
+              <button
+                className={styles.revealBtn}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRevealInFinder(result.file_path);
+                }}
+                title="在 Finder 中显示"
+              >
+                <Search size={10} />
+              </button>
+            </div>
           </div>
-          {node.result && (
-            <>
-              <span className={styles.matchType}>
-                {node.result.match_type === "filename"
-                  ? "文件名"
-                  : node.result.match_type === "content"
-                  ? "内容"
-                  : node.result.match_type === "exif"
-                  ? "EXIF"
-                  : "OCR"}
-              </span>
-              {node.result.match_context && (
-                <span className={styles.context}>
-                  {highlightText(node.result.match_context.substring(0, 80), settings.keyword)}
-                </span>
-              )}
-            </>
+          <span className={styles.matchType}>
+            {result.match_type === "filename"
+              ? "文件名"
+              : result.match_type === "content"
+              ? "内容"
+              : result.match_type === "exif"
+              ? "EXIF"
+              : "OCR"}
+          </span>
+          {result.match_context && (
+            <span className={styles.context}>
+              {highlightText(result.match_context.substring(0, 80), settings.keyword)}
+            </span>
           )}
-          {node.result && node.result.match_type !== "filename" && (
+          {result.match_type !== "filename" && (
             <button
               className={styles.preview}
               onClick={(e) => {
                 e.stopPropagation();
-                handlePreviewFile(node.result);
+                handlePreviewFile(result);
               }}
             >
               <Eye size={12} />
             </button>
           )}
         </div>
-        {node.isDir && isExpanded && (
-          <div>
-            {node.children.map((child: any) => renderNode(child, depth + 1))}
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  if (isFlatMode) {
-    if (filteredResults.length === 0) {
-      return (
-        <div className={styles.empty}>
-          <div className={styles.emptyTitle}>未找到匹配文件</div>
-          <div className={styles.emptySubtitle}>
-            尝试调整关键字或文件类型筛选
-          </div>
-        </div>
       );
     }
 
+    // Tree node
+    const isSelected = node.result
+      ? selectedResults.has(node.result.file_path)
+      : false;
+
     return (
-      <div className={styles.container}>
-        {filteredResults.map((result) => {
-          const isSelected = selectedResults.has(result.file_path);
-          return (
-            <div
-              key={result.file_path}
-              className={`${styles.item} ${isSelected ? styles.selected : ""}`}
-              style={{ paddingLeft: "8px" }}
-              onClick={() => handleToggleSelect(result.file_path)}
-            >
-              <div className={styles.icon}>
-                {getFileIcon(result.file_extension, false)}
-              </div>
-              <div className={styles.fileInfo}>
-                <span className={styles.name}>{result.file_name}</span>
-                <div className={styles.pathRow}>
-                  <span className={styles.path}>{getFileDir(result.file_path)}</span>
-                  <button
-                    className={styles.revealBtn}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleRevealInFinder(result.file_path);
-                    }}
-                    title="在 Finder 中显示"
-                  >
-                    <Search size={10} />
-                  </button>
-                </div>
-              </div>
-              <span className={styles.matchType}>
-                {result.match_type === "filename"
-                  ? "文件名"
-                  : result.match_type === "content"
-                  ? "内容"
-                  : result.match_type === "exif"
-                  ? "EXIF"
-                  : "OCR"}
-              </span>
-              {result.match_context && (
-                <span className={styles.context}>
-                  {highlightText(result.match_context.substring(0, 80), settings.keyword)}
-                </span>
-              )}
-              {result.match_type !== "filename" && (
-                <button
-                  className={styles.preview}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handlePreviewFile(result);
-                  }}
-                >
-                  <Eye size={12} />
-                </button>
-              )}
+      <div
+        className={`${styles.item} ${isSelected ? styles.selected : ""}`}
+        style={{ paddingLeft: `${depth * 16 + 8}px` }}
+        onClick={() => {
+          if (node.isDir) {
+            handleToggleFolder(node.path);
+          } else if (node.result) {
+            handleToggleSelect(node.result.file_path);
+          }
+        }}
+      >
+        <div className={styles.icon}>
+          {getFileIcon(node.isDir ? node.path : node.name, node.isDir)}
+        </div>
+        <div className={styles.fileInfo}>
+          <span className={styles.name}>{node.name}</span>
+          {node.result && (
+            <div className={styles.pathRow}>
+              <span className={styles.path}>{getFileDir(node.result.file_path)}</span>
+              <button
+                className={styles.revealBtn}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRevealInFinder(node.result.file_path);
+                }}
+                title="在 Finder 中显示"
+              >
+                <Search size={10} />
+              </button>
             </div>
-          );
-        })}
+          )}
+        </div>
+        {node.result && (
+          <>
+            <span className={styles.matchType}>
+              {node.result.match_type === "filename"
+                ? "文件名"
+                : node.result.match_type === "content"
+                ? "内容"
+                : node.result.match_type === "exif"
+                ? "EXIF"
+                : "OCR"}
+            </span>
+            {node.result.match_context && (
+              <span className={styles.context}>
+                {highlightText(node.result.match_context.substring(0, 80), settings.keyword)}
+              </span>
+            )}
+          </>
+        )}
+        {node.result && node.result.match_type !== "filename" && (
+          <button
+            className={styles.preview}
+            onClick={(e) => {
+              e.stopPropagation();
+              handlePreviewFile(node.result);
+            }}
+          >
+            <Eye size={12} />
+          </button>
+        )}
       </div>
     );
-  }
+  }, [selectedResults, handleToggleSelect, handleToggleFolder, handlePreviewFile, handleRevealInFinder, getFileIcon, settings.keyword]);
 
-  if (tree!.children.length === 0) {
+  if (!scanProgress) return null;
+
+  if (flatItems.length === 0) {
     return (
       <div className={styles.empty}>
         <div className={styles.emptyTitle}>未找到匹配文件</div>
@@ -344,8 +360,28 @@ export function ResultsTree() {
   }
 
   return (
-    <div className={styles.container}>
-      {tree!.children.map((child) => renderNode(child))}
+    <div ref={parentRef} className={styles.container}>
+      <div
+        className={styles.virtualInner}
+        style={{ height: `${virtualizer.getTotalSize()}px` }}
+      >
+        {virtualizer.getVirtualItems().map((virtualItem) => {
+          const flatNode = flatItems[virtualItem.index];
+          return (
+            <div
+              key={virtualItem.key}
+              data-index={virtualItem.index}
+              ref={virtualizer.measureElement}
+              className={styles.virtualItem}
+              style={{
+                transform: `translateY(${virtualItem.start}px)`,
+              }}
+            >
+              {renderItem(flatNode)}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
