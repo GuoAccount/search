@@ -114,6 +114,14 @@ export interface AppConfig {
     pdf: boolean;
     pptx: boolean;
   };
+  ocr: {
+    enabled: boolean;
+    provider: "macos_native" | "api";
+    api_endpoint: string | null;
+    api_key: string | null;
+    api_secret: string | null;
+    languages: string[];
+  };
   skip_rules: string[];
   scan_rules: string[];
 }

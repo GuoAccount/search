@@ -224,6 +224,116 @@ export function SettingsPanel() {
                     </div>
                   </div>
                 ))}
+
+                <h3 className={styles.sectionTitle}>OCR 图片文字识别</h3>
+                <p className={styles.sectionDescription}>
+                  启用后可在图片中搜索文字内容（默认关闭）
+                </p>
+                <div className={styles.field}>
+                  <label className={styles.fieldLabel}>启用 OCR</label>
+                  <div className={styles.fieldControl}>
+                    <label className={styles.toggle}>
+                      <input
+                        type="checkbox"
+                        checked={cfg.ocr.enabled}
+                        onChange={(e) => {
+                          setCfg((prev) => ({
+                            ...prev,
+                            ocr: { ...prev.ocr, enabled: e.target.checked },
+                          }));
+                        }}
+                      />
+                      <span className={styles.toggleTrack}>
+                        <span className={styles.toggleThumb} />
+                      </span>
+                      <span className={styles.toggleLabel}>
+                        {cfg.ocr.enabled ? "已启用" : "已禁用"}
+                      </span>
+                    </label>
+                  </div>
+                </div>
+
+                {cfg.ocr.enabled && (
+                  <>
+                    <div className={styles.field}>
+                      <label className={styles.fieldLabel}>OCR 提供者</label>
+                      <div className={styles.fieldControl}>
+                        <select
+                          className={styles.select}
+                          value={cfg.ocr.provider}
+                          onChange={(e) => {
+                            setCfg((prev) => ({
+                              ...prev,
+                              ocr: {
+                                ...prev.ocr,
+                                provider: e.target.value as "macos_native" | "api",
+                              },
+                            }));
+                          }}
+                        >
+                          <option value="macos_native">macOS 原生 (仅 macOS)</option>
+                          <option value="api">第三方 API</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {cfg.ocr.provider === "api" && (
+                      <>
+                        <div className={styles.field}>
+                          <label className={styles.fieldLabel}>API 端点</label>
+                          <div className={styles.fieldControl}>
+                            <input
+                              type="text"
+                              className={styles.input}
+                              placeholder="https://api.example.com/ocr"
+                              value={cfg.ocr.api_endpoint || ""}
+                              onChange={(e) => {
+                                setCfg((prev) => ({
+                                  ...prev,
+                                  ocr: { ...prev.ocr, api_endpoint: e.target.value || null },
+                                }));
+                              }}
+                            />
+                          </div>
+                        </div>
+                        <div className={styles.field}>
+                          <label className={styles.fieldLabel}>API Key</label>
+                          <div className={styles.fieldControl}>
+                            <input
+                              type="password"
+                              className={styles.input}
+                              placeholder="输入 API Key"
+                              value={cfg.ocr.api_key || ""}
+                              onChange={(e) => {
+                                setCfg((prev) => ({
+                                  ...prev,
+                                  ocr: { ...prev.ocr, api_key: e.target.value || null },
+                                }));
+                              }}
+                            />
+                          </div>
+                        </div>
+                        <div className={styles.field}>
+                          <label className={styles.fieldLabel}>API Secret</label>
+                          <div className={styles.fieldControl}>
+                            <input
+                              type="password"
+                              className={styles.input}
+                              placeholder="输入 API Secret（可选）"
+                              value={cfg.ocr.api_secret || ""}
+                              onChange={(e) => {
+                                setCfg((prev) => ({
+                                  ...prev,
+                                  ocr: { ...prev.ocr, api_secret: e.target.value || null },
+                                }));
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </>
+                )}
               </div>
             )}
 

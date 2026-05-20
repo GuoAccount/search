@@ -5,6 +5,7 @@ pub mod config;
 pub mod types;
 pub mod commands;
 mod scanner;
+mod ocr;
 
 use types::{ScanStore, CancelStore, ChannelStore};
 
@@ -30,6 +31,19 @@ fn reset_config(app_handle: tauri::AppHandle) -> config::AppConfig {
     cfg
 }
 
+#[tauri::command]
+fn get_log_content(app_handle: tauri::AppHandle) -> Result<String, String> {
+    use tauri::Manager;
+    let log_dir = app_handle.path().app_log_dir().map_err(|e| e.to_string())?;
+    let log_file = log_dir.join("lumina.log");
+    
+    if log_file.exists() {
+        std::fs::read_to_string(&log_file).map_err(|e| e.to_string())
+    } else {
+        Ok(String::new())
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let scan_store: ScanStore = Arc::new(Mutex::new(HashMap::new()));
@@ -40,6 +54,18 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(
+            tauri_plugin_log::Builder::new()
+                .targets([
+                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::LogDir {
+                        file_name: Some("lumina".into()),
+                    }),
+                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout),
+                ])
+                .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepAll)
+                .max_file_size(10_000_000) // 10MB
+                .build(),
+        )
         .manage(scan_store)
         .manage(cancel_store)
         .manage(channel_store)
@@ -48,6 +74,7 @@ pub fn run() {
             get_config,
             save_config,
             reset_config,
+            get_log_content,
             commands::scan::start_scan,
             commands::scan::get_scan_progress,
             commands::scan::cancel_scan,

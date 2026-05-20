@@ -31,6 +31,7 @@ interface AppState {
   showConfirmPanel: boolean;
   showSkippedPanel: boolean;
   showSettings: boolean;
+  showLogViewer: boolean;
   isFullscreen: boolean;
 
   // Config
@@ -57,6 +58,7 @@ interface AppState {
   setShowConfirmPanel: (show: boolean) => void;
   setShowSkippedPanel: (show: boolean) => void;
   setShowSettings: (show: boolean) => void;
+  setShowLogViewer: (show: boolean) => void;
   setAppConfig: (config: AppConfig | null) => void;
   setLocalConfig: (config: AppConfig | null | ((prev: AppConfig | null) => AppConfig | null)) => void;
   setConfigDirty: (dirty: boolean) => void;
@@ -89,6 +91,7 @@ export const useStore = create<AppState>((set, get) => ({
   showConfirmPanel: false,
   showSkippedPanel: false,
   showSettings: false,
+  showLogViewer: false,
   isFullscreen: false,
 
   // Config
@@ -98,14 +101,14 @@ export const useStore = create<AppState>((set, get) => ({
 
   // Scan actions
   startScan: async () => {
-    const { settings } = get();
+    const { settings, appConfig } = get();
     const extensions = getAllExtensions(settings.enabledPresets, settings.customExtensions);
     if (!settings.scanPath || !settings.keyword || extensions.length === 0) return;
 
     const scanTypes = ["file_name", "text_content", "document_content"];
     if (settings.enabledPresets.includes("image")) {
       scanTypes.push("exif_data");
-      if (settings.ocrEnabled) {
+      if (appConfig?.ocr.enabled) {
         scanTypes.push("ocr_text");
       }
     }
@@ -259,6 +262,7 @@ export const useStore = create<AppState>((set, get) => ({
   setShowConfirmPanel: (show) => set({ showConfirmPanel: show }),
   setShowSkippedPanel: (show) => set({ showSkippedPanel: show }),
   setShowSettings: (show) => set({ showSettings: show }),
+  setShowLogViewer: (show) => set({ showLogViewer: show }),
   setAppConfig: (config) => set({ appConfig: config }),
   setLocalConfig: (config) =>
     set((state) => ({

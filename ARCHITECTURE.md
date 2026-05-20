@@ -30,6 +30,7 @@
 │  ┌─────────────────────────────────────────────────────┐ │
 │  │              lib.rs (Tauri 构建入口)                  │ │
 │  │  .manage(ScanStore, CancelStore, ChannelStore)        │ │
+│  │  .plugin(tauri_plugin_log, tauri_plugin_opener, ...)   │ │
 │  └─────────────────────────────────────────────────────┘ │
 │  ┌─────────────────────────────────────────────────────┐ │
 │  │              commands/ (Tauri 命令层)                 │ │
@@ -39,22 +40,27 @@
 │  │              scanner.rs (扫描引擎)                    │ │
 │  │  BFS 线程 → work_tx → Rayon 线程池 → 结果实时返回    │ │
 │  └─────────────────────────────────────────────────────┘ │
-│  ┌──────────────┐  ┌───────────────────────────────────┐ │
-│  │  config.rs   │  │  types.rs (共享数据结构)            │ │
-│  └──────────────┘  └───────────────────────────────────┘ │
+│  ┌─────────────────────────────────────────────────────┐ │
+│  │              ocr/ (OCR 跨平台抽象)                    │ │
+│  │  mod.rs (trait) │ macos.rs (Vision) │ api.rs (HTTP)  │ │
+│  └─────────────────────────────────────────────────────┘ │
+│  ┌──────────────┐  ┌──────────────┐  ┌───────────────┐ │
+│  │  config.rs   │  │  types.rs    │  │  scanner.rs   │ │
+│  └──────────────┘  └──────────────┘  └───────────────┘ │
 └─────────────────────────────────────────────────────────┘
 ```
 
 ## 分层模型
 
 ```
-Types → Config → Scanner → Commands → Store → UI
+Types → Config → OCR → Scanner → Commands → Store → UI
 ```
 
 | 层 | 职责 | 文件 |
 |---|------|------|
 | **Types** | 共享数据结构 | `src-tauri/src/types.rs` + `src/types/` |
 | **Config** | 应用配置持久化 | `src-tauri/src/config.rs` |
+| **OCR** | OCR 跨平台抽象 | `src-tauri/src/ocr/` (trait + macOS Vision + API) |
 | **Scanner** | 文件扫描、匹配算法 | `src-tauri/src/scanner.rs` |
 | **Commands** | Tauri IPC 命令处理 | `src-tauri/src/commands/` |
 | **Store** | 全局状态管理、业务逻辑 | `src/store/index.ts` |
@@ -103,6 +109,11 @@ BFS 遇到大目录 → count_entries_fast() > threshold
 - 2026-05-18: 删除暂停机制，简化代码结构
 - 2026-05-18: 新增文档内容提取（docx/xlsx/pptx/pdf），可配置开关，默认开启
 - 2026-05-18: 文件预览统一为 match_type 驱动（内容匹配可预览，文件名匹配不显示预览按钮）
+- 2026-05-20: 跨平台兼容优化
+  - 使用 `tauri-plugin-opener` 替代平台特定文件操作
+  - 使用 `tauri-plugin-log` 添加日志系统 + panic hook
+  - OCR 跨平台抽象（trait + macOS Vision + 第三方 API）
+  - 系统音频播放全平台支持
 - 技术债：dispatch线程使用recv_timeout轮询，未来可考虑事件驱动
 
 ## 变更检查

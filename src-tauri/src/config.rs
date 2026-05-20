@@ -3,6 +3,53 @@ use std::fs;
 use std::path::PathBuf;
 use tauri::Manager;
 
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub enum OcrProviderType {
+    #[serde(rename = "macos_native")]
+    MacOSNative,
+    #[serde(rename = "api")]
+    Api,
+}
+
+impl Default for OcrProviderType {
+    fn default() -> Self {
+        #[cfg(target_os = "macos")]
+        { OcrProviderType::MacOSNative }
+        #[cfg(not(target_os = "macos"))]
+        { OcrProviderType::Api }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct OcrSettings {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub provider: OcrProviderType,
+    pub api_endpoint: Option<String>,
+    pub api_key: Option<String>,
+    pub api_secret: Option<String>,
+    #[serde(default = "default_ocr_languages")]
+    pub languages: Vec<String>,
+}
+
+fn default_ocr_languages() -> Vec<String> {
+    vec!["zh-Hans".to_string(), "en-US".to_string()]
+}
+
+impl Default for OcrSettings {
+    fn default() -> Self {
+        OcrSettings {
+            enabled: false,
+            provider: OcrProviderType::default(),
+            api_endpoint: None,
+            api_key: None,
+            api_secret: None,
+            languages: default_ocr_languages(),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AppConfig {
     pub version: u32,
@@ -11,6 +58,8 @@ pub struct AppConfig {
     pub display: DisplaySettings,
     #[serde(default = "ContentExtractionSettings::default")]
     pub content_extraction: ContentExtractionSettings,
+    #[serde(default = "OcrSettings::default")]
+    pub ocr: OcrSettings,
     pub skip_rules: Vec<String>,
     pub scan_rules: Vec<String>,
 }
@@ -84,6 +133,7 @@ impl Default for AppConfig {
                 match_context_length: 100,
             },
             content_extraction: ContentExtractionSettings::default(),
+            ocr: OcrSettings::default(),
             skip_rules: vec![
                 "node_modules".into(),
                 ".git".into(),

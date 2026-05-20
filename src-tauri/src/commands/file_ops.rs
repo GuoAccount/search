@@ -116,6 +116,7 @@ pub async fn read_file_preview(
 
 #[tauri::command]
 pub async fn move_to_trash(
+    app_handle: tauri::AppHandle,
     file_paths: Vec<String>,
     scan_id: Option<String>,
     state: tauri::State<'_, ScanStore>,
@@ -140,7 +141,7 @@ pub async fn move_to_trash(
     }
     
     if count > 0 {
-        crate::commands::system::play_trash_sound();
+        crate::commands::system::play_trash_sound(&app_handle);
     }
     
     Ok(count)
@@ -170,33 +171,12 @@ pub fn get_file_info(file_path: String) -> Result<HashMap<String, String>, Strin
 }
 
 #[tauri::command]
-pub async fn reveal_in_finder(file_path: String) -> Result<(), String> {
+pub async fn reveal_in_finder(app_handle: tauri::AppHandle, file_path: String) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
     let path = PathBuf::from(&file_path);
-    
-    #[cfg(target_os = "macos")]
-    {
-        std::process::Command::new("open")
-            .args(["-R", &path.to_string_lossy()])
-            .spawn()
-            .map_err(|e| e.to_string())?;
-    }
-    
-    #[cfg(target_os = "windows")]
-    {
-        std::process::Command::new("explorer")
-            .args(["/select,", &path.to_string_lossy()])
-            .spawn()
-            .map_err(|e| e.to_string())?;
-    }
-    
-    #[cfg(target_os = "linux")]
-    {
-        std::process::Command::new("xdg-open")
-            .arg(path.parent().unwrap_or(&path).to_string_lossy().to_string())
-            .spawn()
-            .map_err(|e| e.to_string())?;
-    }
-    
+    app_handle.opener()
+        .reveal_item_in_dir(&path)
+        .map_err(|e| e.to_string())?;
     Ok(())
 }
 

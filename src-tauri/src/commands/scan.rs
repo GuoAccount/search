@@ -17,6 +17,8 @@ pub async fn start_scan(
     channel_state: tauri::State<'_, ChannelStore>,
 ) -> Result<String, String> {
     let scan_id = Uuid::new_v4().to_string();
+    log::info!("Starting scan with id={}, keyword='{}', path='{}'", 
+        scan_id, config.keyword, config.path);
 
     let progress = ScanProgress {
         scan_id: scan_id.clone(),
@@ -99,6 +101,8 @@ pub async fn start_scan(
         if let Some(progress) = store_guard.get_mut(&sid) {
             progress.status = "completed".to_string();
             progress.current_path = String::new();
+            log::info!("Scan {} completed: {} results found, {} files scanned", 
+                sid, progress.results_found, progress.files_scanned);
         }
     });
 
@@ -120,6 +124,8 @@ pub fn cancel_scan(
     state: tauri::State<'_, ScanStore>,
     cancel_state: tauri::State<'_, CancelStore>,
 ) -> Result<(), String> {
+    log::info!("Cancelling scan: {}", scan_id);
+    
     let mut store = state.lock().unwrap();
     if let Some(progress) = store.get_mut(&scan_id) {
         progress.status = "cancelled".to_string();

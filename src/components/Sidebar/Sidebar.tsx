@@ -1,7 +1,7 @@
 import { useStore } from "../../store";
 import { PresetSelector } from "../PresetSelector/PresetSelector";
 import { DEFAULT_PRESETS } from "../../constants/presets";
-import { Sun, Moon, Monitor, Settings } from "lucide-react";
+import { Sun, Moon, Monitor, Settings, FileText } from "lucide-react";
 import styles from "./Sidebar.module.css";
 
 export function Sidebar() {
@@ -11,6 +11,7 @@ export function Sidebar() {
     setShowSettings,
     setLocalConfig,
     setConfigDirty,
+    setShowLogViewer,
     appConfig,
   } = useStore();
 
@@ -64,6 +65,13 @@ export function Sidebar() {
             <Settings size={14} />
           </button>
           <button
+            className={styles.settingsBtn}
+            onClick={() => setShowLogViewer(true)}
+            title="日志"
+          >
+            <FileText size={14} />
+          </button>
+          <button
             className={styles.themeBtn}
             onClick={cycleTheme}
             title={themeTitle}
@@ -75,7 +83,6 @@ export function Sidebar() {
           <span>
             {selectedCount} 类 · {extCount} 种格式
           </span>
-          {settings.ocrEnabled && <span> · OCR 已启用</span>}
         </div>
       </div>
     </div>

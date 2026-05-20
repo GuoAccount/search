@@ -166,6 +166,26 @@
 **问题：** remember 参数未使用  
 **建议：** 添加复选框让用户选择
 
+### OPT-006: 跨平台兼容优化
+
+**状态：** 已完成  
+**优先级：** P1  
+**问题：** 与 macOS 高度耦合，Windows 搜索闪退无日志  
+
+**修复方案：**
+1. 文件操作跨平台：使用 `tauri-plugin-opener` 替代 `#[cfg(target_os)]` + `std::process::Command`
+2. 日志系统：使用 `tauri-plugin-log`，支持文件输出 + rotation + panic hook
+3. OCR 跨平台：抽象 `OcrProvider` trait，支持 macOS Vision 和第三方 API
+4. 音频播放：`play_system_sound` 添加 Windows/Linux 支持
+
+**相关文件：**
+- `src-tauri/src/commands/file_ops.rs` — reveal_in_finder (重构)
+- `src-tauri/src/commands/system.rs` — open_config_file, play_system_sound (重构)
+- `src-tauri/src/ocr/` — OCR 跨平台抽象 (新增)
+- `src-tauri/src/config.rs` — OcrSettings (新增)
+- `src-tauri/src/lib.rs` — 日志插件注册
+- `src-tauri/src/main.rs` — panic hook
+
 ---
 
 ## 🟢 技术债

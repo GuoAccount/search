@@ -1,11 +1,39 @@
-#[tauri::command]
-pub fn play_system_sound() -> Result<(), String> {
+use std::path::PathBuf;
+use tauri::Manager;
+
+fn play_sound(path: &PathBuf) {
     #[cfg(target_os = "macos")]
     {
-        std::process::Command::new("afplay")
-            .args(["/System/Library/Sounds/Pop.aiff"])
-            .spawn()
-            .map_err(|e| e.to_string())?;
+        let _ = std::process::Command::new("afplay")
+            .arg(path.to_string_lossy().to_string())
+            .spawn();
+    }
+    
+    #[cfg(target_os = "windows")]
+    {
+        let _ = std::process::Command::new("powershell")
+            .args(["-c", &format!("(New-Object Media.SoundPlayer '{}').Play()", path.to_string_lossy())])
+            .spawn();
+    }
+    
+    #[cfg(target_os = "linux")]
+    {
+        let _ = std::process::Command::new("aplay")
+            .arg(path.to_string_lossy().to_string())
+            .spawn();
+    }
+}
+
+#[tauri::command]
+pub fn play_system_sound(app_handle: tauri::AppHandle) -> Result<(), String> {
+    let resource_dir = app_handle.path().resource_dir()
+        .map_err(|e| e.to_string())?;
+    let sound_path = resource_dir.join("resources").join("Pop.aiff");
+    log::debug!("play_system_sound: {:?}", sound_path);
+    if sound_path.exists() {
+        play_sound(&sound_path);
+    } else {
+        log::warn!("Sound file not found: {:?}", sound_path);
     }
     Ok(())
 }
@@ -13,66 +41,20 @@ pub fn play_system_sound() -> Result<(), String> {
 #[tauri::command]
 pub fn open_config_file(app_handle: tauri::AppHandle) -> Result<(), String> {
     use crate::config::AppConfig;
+    use tauri_plugin_opener::OpenerExt;
     let path = AppConfig::config_path(&app_handle);
-    #[cfg(target_os = "macos")]
-    {
-        std::process::Command::new("open")
-            .args(["-R", &path.to_string_lossy()])
-            .spawn()
-            .map_err(|e| e.to_string())?;
-    }
-    #[cfg(target_os = "windows")]
-    {
-        std::process::Command::new("explorer")
-            .args(["/select,", &path.to_string_lossy()])
-            .spawn()
-            .map_err(|e| e.to_string())?;
-    }
-    #[cfg(target_os = "linux")]
-    {
-        std::process::Command::new("xdg-open")
-            .arg(path.parent().unwrap_or(&path).to_string_lossy().to_string())
-            .spawn()
-            .map_err(|e| e.to_string())?;
-    }
+    app_handle.opener()
+        .reveal_item_in_dir(&path)
+        .map_err(|e| e.to_string())?;
     Ok(())
 }
 
-pub fn play_trash_sound() {
-    let possible_paths = vec![
-        std::env::current_exe().ok()
-            .and_then(|p| p.parent().map(|p| p.to_path_buf()))
-            .and_then(|p| p.parent().map(|p| p.to_path_buf()))
-            .map(|p| p.join("Resources/resources/trash.aif")),
-        std::env::current_exe().ok()
-            .and_then(|p| p.parent().map(|p| p.to_path_buf()))
-            .map(|p| p.join("resources/trash.aif")),
-    ];
-    
-    let resource_path = possible_paths.into_iter()
-        .flatten()
-        .find(|p| p.exists());
-    
-    if let Some(path) = resource_path {
-        #[cfg(target_os = "macos")]
-        {
-            let _ = std::process::Command::new("afplay")
-                .arg(path.to_string_lossy().to_string())
-                .spawn();
-        }
-        
-        #[cfg(target_os = "windows")]
-        {
-            let _ = std::process::Command::new("powershell")
-                .args(["-c", &format!("(New-Object Media.SoundPlayer '{}').Play()", path.to_string_lossy())])
-                .spawn();
-        }
-        
-        #[cfg(target_os = "linux")]
-        {
-            let _ = std::process::Command::new("aplay")
-                .arg(path.to_string_lossy().to_string())
-                .spawn();
+pub fn play_trash_sound(app_handle: &tauri::AppHandle) {
+    if let Ok(resource_dir) = app_handle.path().resource_dir() {
+        let sound_path = resource_dir.join("resources").join("trash.aif");
+        log::debug!("play_trash_sound: {:?}", sound_path);
+        if sound_path.exists() {
+            play_sound(&sound_path);
         }
     }
 }

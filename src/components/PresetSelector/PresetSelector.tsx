@@ -1,6 +1,6 @@
 import { useStore } from "../../store";
 import { DEFAULT_PRESETS } from "../../constants/presets";
-import { Check, ChevronDown, ChevronRight, Plus, X, ScanEye } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Plus, X } from "lucide-react";
 import styles from "./PresetSelector.module.css";
 
 export function PresetSelector() {
@@ -136,31 +136,6 @@ export function PresetSelector() {
                     <Plus size={12} />
                   </button>
                 </div>
-                {key === "image" && (
-                  <div className={styles.ocr}>
-                    <label className={styles.ocrToggle}>
-                      <input
-                        type="checkbox"
-                        checked={settings.ocrEnabled}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            const p = navigator.platform.toLowerCase();
-                            if (p.includes("linux")) {
-                              alert("Linux 平台暂不支持 OCR 功能");
-                              return;
-                            }
-                          }
-                          updateSettings({ ocrEnabled: e.target.checked });
-                        }}
-                      />
-                      <span className={styles.ocrSlider}></span>
-                    </label>
-                    <div className={styles.ocrInfo}>
-                      <ScanEye size={13} />
-                      <span className={styles.ocrLabel}>OCR 文字识别</span>
-                    </div>
-                  </div>
-                )}
               </div>
             )}
           </div>

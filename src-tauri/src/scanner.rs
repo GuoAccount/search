@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{self, Sender, Receiver};
 use std::sync::atomic::{AtomicU32, AtomicBool, Ordering};
@@ -13,6 +12,7 @@ use exif::Reader;
 
 use crate::types::{PendingConfirmation, SkippedDir, ScanConfig, DirWork};
 use crate::config::ContentExtractionSettings;
+use crate::ocr::OcrProvider;
 
 fn extract_context(line: &str, keyword: &str, context_around: usize) -> String {
     let lower = line.to_lowercase();
@@ -54,16 +54,6 @@ pub struct ScanResult {
     pub is_dir: bool,
 }
 
-#[derive(Debug, Deserialize)]
-#[allow(dead_code)]
-struct OCRRegion {
-    text: String,
-    x: f64,
-    y: f64,
-    w: f64,
-    h: f64,
-}
-
 pub struct ScanCallback {
     pub on_result: Box<dyn Fn(ScanResult) + Send>,
     pub on_progress: Box<dyn Fn(u32, String) + Send>,
@@ -84,6 +74,7 @@ struct ScanContext {
     ask_on_large_dir: bool,
     context_around: usize,
     content_extraction: ContentExtractionSettings,
+    ocr_provider: Option<Arc<dyn OcrProvider>>,
 }
 
 // ─── Public entry point ───────────────────────────────────────────────────────
@@ -95,7 +86,25 @@ pub fn scan_directory(
     work_tx: Sender<DirWork>,
     work_rx: Receiver<DirWork>,
 ) {
+    log::info!("Starting scan: keyword='{}', path='{}', types={:?}", 
+        config.keyword, config.path, config.scan_types);
+    
     let root = PathBuf::from(&config.path);
+    
+    // Initialize OCR provider based on config
+    let ocr_provider: Option<Arc<dyn OcrProvider>> = if app_config.ocr.enabled && config.scan_types.contains(&"ocr_text".to_string()) {
+        let provider = crate::ocr::create_ocr_provider(&app_config.ocr);
+        if provider.is_available() {
+            log::info!("OCR provider initialized: {}", provider.name());
+            Some(Arc::from(provider))
+        } else {
+            log::warn!("OCR provider '{}' is not available", provider.name());
+            None
+        }
+    } else {
+        None
+    };
+    
     let ctx = Arc::new(ScanContext {
         keyword: config.keyword.to_lowercase(),
         scan_types: config.scan_types,
@@ -107,6 +116,7 @@ pub fn scan_directory(
         ask_on_large_dir: app_config.scan.ask_on_large_dir,
         context_around: app_config.display.match_context_length as usize,
         content_extraction: app_config.content_extraction.clone(),
+        ocr_provider,
     });
 
     let (result_tx, result_rx) = mpsc::channel::<ScanResult>();
@@ -395,33 +405,37 @@ fn search_directory(
         let mut matched = false;
 
         // 1. OCR text matching (highest priority for images)
-        #[cfg(target_os = "macos")]
         if !matched && ctx.scan_types.contains(&"ocr_text".to_string()) && is_image_file(&extension) {
-            if let Ok(regions) = perform_ocr(&path) {
-                let all_text: Vec<&str> = regions.iter().map(|r| r.text.as_str()).collect();
-                let joined = all_text.join("\n");
-                if !joined.is_empty() && joined.to_lowercase().contains(&ctx.keyword) {
-                    let matched_bboxes: Vec<serde_json::Value> = regions.iter()
-                        .filter(|r| r.text.to_lowercase().contains(&ctx.keyword))
-                        .map(|r| serde_json::json!({"x": r.x, "y": r.y, "w": r.w, "h": r.h}))
-                        .collect();
-                    let bboxes_json = if matched_bboxes.is_empty() {
-                        None
-                    } else {
-                        Some(serde_json::to_string(&matched_bboxes).unwrap_or_default())
-                    };
-                    let _ = result_tx.send(ScanResult {
-                        file_path: path.to_string_lossy().to_string(),
-                        file_name: file_name.clone(),
-                        match_type: "ocr".to_string(),
-                        match_line: None,
-                        match_context: Some(extract_context(&joined, &ctx.keyword, ctx.context_around)),
-                        match_bboxes: bboxes_json,
-                        file_size: metadata.len(),
-                        file_extension: extension.clone(),
-                        is_dir: false,
-                    });
-                    matched = true;
+            if let Some(ref ocr) = ctx.ocr_provider {
+                match ocr.recognize(&path) {
+                    Ok(result) => {
+                        if !result.raw_text.is_empty() && result.raw_text.to_lowercase().contains(&ctx.keyword) {
+                            let matched_bboxes: Vec<serde_json::Value> = result.regions.iter()
+                                .filter(|r| r.text.to_lowercase().contains(&ctx.keyword))
+                                .map(|r| serde_json::json!({"x": r.x, "y": r.y, "w": r.w, "h": r.h}))
+                                .collect();
+                            let bboxes_json = if matched_bboxes.is_empty() {
+                                None
+                            } else {
+                                Some(serde_json::to_string(&matched_bboxes).unwrap_or_default())
+                            };
+                            let _ = result_tx.send(ScanResult {
+                                file_path: path.to_string_lossy().to_string(),
+                                file_name: file_name.clone(),
+                                match_type: "ocr".to_string(),
+                                match_line: None,
+                                match_context: Some(extract_context(&result.raw_text, &ctx.keyword, ctx.context_around)),
+                                match_bboxes: bboxes_json,
+                                file_size: metadata.len(),
+                                file_extension: extension.clone(),
+                                is_dir: false,
+                            });
+                            matched = true;
+                        }
+                    }
+                    Err(e) => {
+                        log::warn!("OCR failed for {}: {}", path.display(), e);
+                    }
                 }
             }
         }
@@ -762,32 +776,4 @@ fn extract_exif(path: &Path) -> Result<String, String> {
         exif_data.push(format!("{}: {}", tag, value));
     }
     Ok(exif_data.join("; "))
-}
-
-#[allow(dead_code)]
-fn perform_ocr(path: &Path) -> Result<Vec<OCRRegion>, String> {
-    let script = include_str!("../resources/ocr.swift");
-    let temp_dir = std::env::temp_dir();
-    let temp_script = temp_dir.join("lumina_ocr.swift");
-    fs::write(&temp_script, script).map_err(|e| e.to_string())?;
-    let output = Command::new("swift")
-        .arg(&temp_script)
-        .arg(path.to_string_lossy().to_string())
-        .output()
-        .map_err(|e| e.to_string())?;
-    let _ = fs::remove_file(&temp_script);
-    if output.status.success() {
-        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-        let trimmed = stdout.trim().to_string();
-        if trimmed.starts_with('[') {
-            serde_json::from_str(&trimmed).map_err(|e| e.to_string())
-        } else if trimmed.starts_with("ERROR") {
-            Err(trimmed)
-        } else {
-            Err("Unexpected OCR output".to_string())
-        }
-    } else {
-        let error = String::from_utf8_lossy(&output.stderr).to_string();
-        Err(error)
-    }
 }
