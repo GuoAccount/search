@@ -34,14 +34,40 @@ fn reset_config(app_handle: tauri::AppHandle) -> config::AppConfig {
 #[tauri::command]
 fn get_log_content(app_handle: tauri::AppHandle) -> Result<String, String> {
     use tauri::Manager;
+    use std::io::{BufRead, BufReader, Seek, SeekFrom};
     let log_dir = app_handle.path().app_log_dir().map_err(|e| e.to_string())?;
     let log_file = log_dir.join("lumina.log");
     
-    if log_file.exists() {
-        std::fs::read_to_string(&log_file).map_err(|e| e.to_string())
-    } else {
-        Ok(String::new())
+    if !log_file.exists() {
+        return Ok(String::new());
     }
+
+    let file = std::fs::File::open(&log_file).map_err(|e| e.to_string())?;
+    let metadata = file.metadata().map_err(|e| e.to_string())?;
+    let file_size = metadata.len();
+
+    // Read last ~100KB max, then take last 500 lines
+    let read_size = file_size.min(100_000);
+    let mut reader = BufReader::new(file);
+    let _ = reader.seek(SeekFrom::End(-(read_size as i64)));
+    
+    let mut lines: Vec<String> = reader
+        .lines()
+        .filter_map(|l| l.ok())
+        .collect();
+    
+    // Drop the first (potentially partial) line
+    if lines.len() > 1 {
+        lines.remove(0);
+    }
+    
+    // Keep last 500 lines
+    let total = lines.len();
+    if total > 500 {
+        lines = lines.split_off(total - 500);
+    }
+    
+    Ok(lines.join("\n"))
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -62,8 +88,9 @@ pub fn run() {
                     }),
                     tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout),
                 ])
-                .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepSome(5))
-                .max_file_size(10_000_000) // 10MB
+                .level(log::LevelFilter::Warn)
+                .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepSome(3))
+                .max_file_size(5_000_000)
                 .build(),
         )
         .manage(scan_store)

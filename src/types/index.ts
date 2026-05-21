@@ -121,6 +121,7 @@ export interface AppConfig {
     api_key: string | null;
     api_secret: string | null;
     languages: string[];
+    concurrent: number;
   };
   skip_rules: string[];
   scan_rules: string[];

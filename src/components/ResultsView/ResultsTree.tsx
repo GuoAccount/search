@@ -348,7 +348,9 @@ export function ResultsTree() {
 
   if (!scanProgress) return null;
 
-  if (flatItems.length === 0) {
+  const scanDone = scanProgress.status === "completed" || scanProgress.status === "cancelled";
+
+  if (scanDone && flatItems.length === 0) {
     return (
       <div className={styles.empty}>
         <div className={styles.emptyTitle}>未找到匹配文件</div>

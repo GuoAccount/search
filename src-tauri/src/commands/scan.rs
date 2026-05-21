@@ -17,8 +17,6 @@ pub async fn start_scan(
     channel_state: tauri::State<'_, ChannelStore>,
 ) -> Result<String, String> {
     let scan_id = Uuid::new_v4().to_string();
-    log::info!("Starting scan with id={}, keyword='{}', path='{}'", 
-        scan_id, config.keyword, config.path);
 
     let progress = ScanProgress {
         scan_id: scan_id.clone(),
@@ -50,48 +48,48 @@ pub async fn start_scan(
     let channel_store = channel_state.inner().clone();
     let sid = scan_id.clone();
 
-    tokio::spawn(async move {
-        let store_for_result = store.clone();
-        let store_for_progress = store.clone();
-        let store_for_confirmation = store.clone();
-        let store_for_skipped = store.clone();
-        let sid_for_result = sid.clone();
-        let sid_for_progress = sid.clone();
-        let sid_for_confirmation = sid.clone();
-        let sid_for_skipped = sid.clone();
-        let app_handle_clone = app_handle.clone();
+    let store_for_result = store.clone();
+    let store_for_progress = store.clone();
+    let store_for_confirmation = store.clone();
+    let store_for_skipped = store.clone();
+    let sid_for_result = sid.clone();
+    let sid_for_progress = sid.clone();
+    let sid_for_confirmation = sid.clone();
+    let sid_for_skipped = sid.clone();
+    let app_handle_clone = app_handle.clone();
 
-        let callback = ScanCallback {
-            on_result: Box::new(move |result: ScanResult| {
-                let mut store_guard = store_for_result.lock().unwrap();
-                if let Some(progress) = store_guard.get_mut(&sid_for_result) {
-                    progress.results.push(result);
-                    progress.results_found = progress.results.len() as u32;
-                }
-            }),
-            on_progress: Box::new(move |files_scanned: u32, current_path: String| {
-                let mut store_guard = store_for_progress.lock().unwrap();
-                if let Some(progress) = store_guard.get_mut(&sid_for_progress) {
-                    progress.files_scanned = files_scanned;
-                    progress.current_path = current_path;
-                }
-            }),
-            on_confirmation_needed: Box::new(move |confirmation: PendingConfirmation| {
-                let mut store_guard = store_for_confirmation.lock().unwrap();
-                if let Some(progress) = store_guard.get_mut(&sid_for_confirmation) {
-                    progress.pending_confirmations.push(confirmation.clone());
-                }
-                let _ = app_handle_clone.emit("confirmation-needed", confirmation);
-            }),
-            on_dir_skipped: Box::new(move |skipped: SkippedDir| {
-                let mut store_guard = store_for_skipped.lock().unwrap();
-                if let Some(progress) = store_guard.get_mut(&sid_for_skipped) {
-                    progress.skipped_dirs.push(skipped);
-                }
-            }),
-            should_cancel: should_cancel.clone(),
-        };
+    let callback = ScanCallback {
+        on_result: Box::new(move |result: ScanResult| {
+            let mut store_guard = store_for_result.lock().unwrap();
+            if let Some(progress) = store_guard.get_mut(&sid_for_result) {
+                progress.results.push(result);
+                progress.results_found = progress.results.len() as u32;
+            }
+        }),
+        on_progress: Box::new(move |files_scanned: u32, current_path: String| {
+            let mut store_guard = store_for_progress.lock().unwrap();
+            if let Some(progress) = store_guard.get_mut(&sid_for_progress) {
+                progress.files_scanned = files_scanned;
+                progress.current_path = current_path;
+            }
+        }),
+        on_confirmation_needed: Box::new(move |confirmation: PendingConfirmation| {
+            let mut store_guard = store_for_confirmation.lock().unwrap();
+            if let Some(progress) = store_guard.get_mut(&sid_for_confirmation) {
+                progress.pending_confirmations.push(confirmation.clone());
+            }
+            let _ = app_handle_clone.emit("confirmation-needed", confirmation);
+        }),
+        on_dir_skipped: Box::new(move |skipped: SkippedDir| {
+            let mut store_guard = store_for_skipped.lock().unwrap();
+            if let Some(progress) = store_guard.get_mut(&sid_for_skipped) {
+                progress.skipped_dirs.push(skipped);
+            }
+        }),
+        should_cancel: should_cancel.clone(),
+    };
 
+    tokio::task::spawn_blocking(move || {
         crate::scanner::scan_directory(config, app_config, callback, work_tx, work_rx);
 
         // Cleanup: remove channel from store (this drops the last work_tx clone)
@@ -101,8 +99,6 @@ pub async fn start_scan(
         if let Some(progress) = store_guard.get_mut(&sid) {
             progress.status = "completed".to_string();
             progress.current_path = String::new();
-            log::info!("Scan {} completed: {} results found, {} files scanned", 
-                sid, progress.results_found, progress.files_scanned);
         }
     });
 
@@ -124,7 +120,6 @@ pub fn cancel_scan(
     state: tauri::State<'_, ScanStore>,
     cancel_state: tauri::State<'_, CancelStore>,
 ) -> Result<(), String> {
-    log::info!("Cancelling scan: {}", scan_id);
     
     let mut store = state.lock().unwrap();
     if let Some(progress) = store.get_mut(&scan_id) {

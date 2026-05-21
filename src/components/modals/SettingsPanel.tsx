@@ -334,6 +334,31 @@ export function SettingsPanel() {
                     </div>
                   </div>
 
+                  <div className={styles.field}>
+                    <label className={styles.fieldLabel}>OCR 并发数</label>
+                    <div className={styles.fieldControl}>
+                      <input
+                        type="number"
+                        className={styles.input}
+                        min={1}
+                        max={8}
+                        value={cfg.ocr.concurrent}
+                        onChange={(e) => {
+                          setCfg((prev) => ({
+                            ...prev,
+                            ocr: {
+                              ...prev.ocr,
+                              concurrent: Math.max(1, Math.min(8, Number(e.target.value) || 2)),
+                            },
+                          }));
+                        }}
+                      />
+                    </div>
+                    <span className={styles.fieldHint}>
+                      同时处理的 OCR 任务数，不影响非图片文件的扫描速度
+                    </span>
+                  </div>
+
                   {cfg.ocr.provider === "api" && (
                     <>
                       <div className={styles.field}>

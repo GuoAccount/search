@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
+pub mod queue;
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct OCRRegion {
     pub text: String,

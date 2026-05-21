@@ -29,11 +29,8 @@ pub fn play_system_sound(app_handle: tauri::AppHandle) -> Result<(), String> {
     let resource_dir = app_handle.path().resource_dir()
         .map_err(|e| e.to_string())?;
     let sound_path = resource_dir.join("resources").join("Pop.aiff");
-    log::debug!("play_system_sound: {:?}", sound_path);
     if sound_path.exists() {
         play_sound(&sound_path);
-    } else {
-        log::warn!("Sound file not found: {:?}", sound_path);
     }
     Ok(())
 }
@@ -52,7 +49,6 @@ pub fn open_config_file(app_handle: tauri::AppHandle) -> Result<(), String> {
 pub fn play_trash_sound(app_handle: &tauri::AppHandle) {
     if let Ok(resource_dir) = app_handle.path().resource_dir() {
         let sound_path = resource_dir.join("resources").join("trash.aif");
-        log::debug!("play_trash_sound: {:?}", sound_path);
         if sound_path.exists() {
             play_sound(&sound_path);
         }

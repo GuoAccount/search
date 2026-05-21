@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { useStore } from "../../store";
 import { FileText, X, Trash2, Download, RefreshCw } from "lucide-react";
 import styles from "./LogViewer.module.css";
@@ -9,53 +10,53 @@ interface LogEntry {
   message: string;
 }
 
+const LOG_RE = /^\[(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})\]\s+(\w+)\s+(.*)/;
+
+function parseLogs(content: string): LogEntry[] {
+  if (!content) return [];
+  return content
+    .split("\n")
+    .filter((l) => l.trim())
+    .map((line) => {
+      const m = line.match(LOG_RE);
+      return m
+        ? { timestamp: m[1], level: m[2] as LogEntry["level"], message: m[3] }
+        : { timestamp: "", level: "INFO" as const, message: line };
+    });
+}
+
 export function LogViewer() {
   const { showLogViewer, setShowLogViewer } = useStore();
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [filter, setFilter] = useState<string>("all");
-  const logsEndRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (showLogViewer) {
-      loadLogs();
-    }
-  }, [showLogViewer]);
+  const [filter, setFilter] = useState("all");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const endRef = useRef<HTMLDivElement>(null);
 
   const loadLogs = async () => {
+    setLoading(true);
+    setError(null);
     try {
-      const { invoke } = await import("@tauri-apps/api/core");
-      const logContent = await invoke<string>("get_log_content");
-      const parsed = parseLogs(logContent);
-      setLogs(parsed);
+      const content = await invoke<string>("get_log_content");
+      setLogs(parseLogs(content));
     } catch (err) {
-      console.error("Failed to load logs:", err);
+      setError(String(err));
+      setLogs([]);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const parseLogs = (content: string): LogEntry[] => {
-    if (!content) return [];
-    const lines = content.split("\n").filter((l) => l.trim());
-    return lines.map((line) => {
-      const match = line.match(
-        /\[(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})\]\s+(\w+)\s+(.*)/
-      );
-      if (match) {
-        return {
-          timestamp: match[1],
-          level: match[2] as LogEntry["level"],
-          message: match[3],
-        };
-      }
-      return { timestamp: "", level: "INFO", message: line };
-    });
-  };
+  useEffect(() => {
+    if (showLogViewer) loadLogs();
+  }, [showLogViewer]);
 
-  const filteredLogs =
-    filter === "all"
-      ? logs
-      : logs.filter((l) => l.level.toLowerCase() === filter);
+  useEffect(() => {
+    if (showLogViewer) endRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [logs, filter, showLogViewer]);
 
-  const handleClear = () => setLogs([]);
+  const filtered =
+    filter === "all" ? logs : logs.filter((l) => l.level.toLowerCase() === filter);
 
   const handleExport = () => {
     const text = logs
@@ -81,13 +82,17 @@ export function LogViewer() {
             <span>日志</span>
           </div>
           <div className={styles.headerActions}>
-            <button className={styles.actionBtn} onClick={loadLogs}>
+            <button className={styles.actionBtn} onClick={loadLogs} title="刷新">
               <RefreshCw size={13} />
             </button>
-            <button className={styles.actionBtn} onClick={handleExport}>
+            <button className={styles.actionBtn} onClick={handleExport} title="导出">
               <Download size={13} />
             </button>
-            <button className={styles.actionBtn} onClick={handleClear}>
+            <button
+              className={styles.actionBtn}
+              onClick={() => setLogs([])}
+              title="清空"
+            >
               <Trash2 size={13} />
             </button>
             <button
@@ -99,7 +104,7 @@ export function LogViewer() {
           </div>
         </div>
         <div className={styles.toolbar}>
-          {["all", "info", "warn", "error", "debug"].map((level) => (
+          {["all", "warn", "error"].map((level) => (
             <button
               key={level}
               className={`${styles.filterBtn} ${filter === level ? styles.filterActive : ""}`}
@@ -108,13 +113,19 @@ export function LogViewer() {
               {level === "all" ? "全部" : level.toUpperCase()}
             </button>
           ))}
-          <span className={styles.count}>{filteredLogs.length} 条</span>
+          <span className={styles.count}>
+            {loading ? "加载中..." : `${filtered.length} 条`}
+          </span>
         </div>
         <div className={styles.content}>
-          {filteredLogs.length === 0 ? (
-            <div className={styles.empty}>暂无日志</div>
+          {error ? (
+            <div className={styles.empty}>加载失败: {error}</div>
+          ) : filtered.length === 0 ? (
+            <div className={styles.empty}>
+              {loading ? "加载中..." : "暂无日志"}
+            </div>
           ) : (
-            filteredLogs.map((log, i) => (
+            filtered.map((log, i) => (
               <div
                 key={i}
                 className={`${styles.logEntry} ${styles[`level${log.level}`]}`}
@@ -125,7 +136,7 @@ export function LogViewer() {
               </div>
             ))
           )}
-          <div ref={logsEndRef} />
+          <div ref={endRef} />
         </div>
       </div>
     </div>

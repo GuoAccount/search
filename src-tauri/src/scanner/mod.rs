@@ -5,7 +5,7 @@ mod helpers;
 mod matchers;
 mod worker;
 
-pub use context::{ScanResult, ScanCallback, ScanContext};
+pub use context::{ScanResult, ScanCallback, ScanContext, extract_context};
 pub use document::extract_document_text;
 pub use helpers::{is_text_file, is_document_file};
 
@@ -18,6 +18,7 @@ use std::time::Duration;
 use crate::types::DirWork;
 use crate::config::AppConfig;
 use crate::ocr;
+use crate::ocr::queue::OcrQueue;
 
 pub fn scan_directory(
     config: crate::types::ScanConfig,
@@ -26,15 +27,11 @@ pub fn scan_directory(
     work_tx: Sender<DirWork>,
     work_rx: Receiver<DirWork>,
 ) {
-    log::info!("Starting scan: keyword='{}', path='{}', types={:?}", 
-        config.keyword, config.path, config.scan_types);
-    
     let root = PathBuf::from(&config.path);
     
     let ocr_provider: Option<Arc<dyn crate::ocr::OcrProvider>> = if app_config.ocr.enabled && config.scan_types.contains(&"ocr_text".to_string()) {
         let provider = ocr::create_ocr_provider(&app_config.ocr);
         if provider.is_available() {
-            log::info!("OCR provider initialized: {}", provider.name());
             Some(Arc::from(provider))
         } else {
             log::warn!("OCR provider '{}' is not available", provider.name());
@@ -43,7 +40,30 @@ pub fn scan_directory(
     } else {
         None
     };
-    
+
+    let (result_tx, result_rx) = mpsc::channel::<ScanResult>();
+    let (progress_tx, progress_rx) = mpsc::channel::<(u32, String)>();
+
+    let cancel_flag = callback.should_cancel.clone();
+    let files_scanned = Arc::new(AtomicU32::new(0));
+
+    let (ocr_queue_handle, ocr_task_tx) = if let Some(ref provider) = ocr_provider {
+        let concurrent = app_config.ocr.concurrent.max(1);
+        let keyword = config.keyword.to_lowercase();
+        let context_around = app_config.display.match_context_length as usize;
+        let (queue, tx) = OcrQueue::new(
+            concurrent,
+            provider.clone(),
+            keyword,
+            context_around,
+            result_tx.clone(),
+            cancel_flag.clone(),
+        );
+        (Some(queue), Some(tx))
+    } else {
+        (None, None)
+    };
+
     let ctx = Arc::new(ScanContext {
         keyword: config.keyword.to_lowercase(),
         scan_types: config.scan_types,
@@ -55,14 +75,8 @@ pub fn scan_directory(
         ask_on_large_dir: app_config.scan.ask_on_large_dir,
         context_around: app_config.display.match_context_length as usize,
         content_extraction: app_config.content_extraction.clone(),
-        ocr_provider,
+        ocr_queue: ocr_task_tx.clone(),
     });
-
-    let (result_tx, result_rx) = mpsc::channel::<ScanResult>();
-    let (progress_tx, progress_rx) = mpsc::channel::<(u32, String)>();
-
-    let cancel_flag = callback.should_cancel.clone();
-    let files_scanned = Arc::new(AtomicU32::new(0));
 
     let bfs_ctx = ctx.clone();
     let bfs_cancel = cancel_flag.clone();
@@ -148,6 +162,11 @@ pub fn scan_directory(
 
     while active_count.load(Ordering::SeqCst) > 0 {
         std::thread::sleep(Duration::from_millis(10));
+    }
+
+    drop(ocr_task_tx);
+    if let Some(queue) = ocr_queue_handle {
+        queue.wait_timeout(Duration::from_secs(30));
     }
 
     drop(result_tx);

@@ -1,7 +1,10 @@
 import { useState, useRef, useEffect } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { useStore } from "../../store";
 import { FolderOpen, X } from "lucide-react";
 import styles from "./ConfirmPanel.module.css";
+
+const ITEM_HEIGHT = 72;
 
 export function ConfirmPanel() {
   const {
@@ -13,6 +16,16 @@ export function ConfirmPanel() {
   } = useStore();
 
   const [rememberMap, setRememberMap] = useState<Record<string, boolean>>({});
+  const parentRef = useRef<HTMLDivElement>(null);
+
+  const items = scanProgress?.pending_confirmations ?? [];
+
+  const virtualizer = useVirtualizer({
+    count: items.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => ITEM_HEIGHT,
+    overscan: 5,
+  });
 
   const toggleRemember = (id: string) => {
     setRememberMap((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -40,53 +53,63 @@ export function ConfirmPanel() {
             </button>
           </div>
         </div>
-        <div className={styles.body}>
-          {scanProgress.pending_confirmations.length === 0 ? (
+        <div className={styles.body} ref={parentRef}>
+          {items.length === 0 ? (
             <div className={styles.empty}>没有待确认事项</div>
           ) : (
-            <div className={styles.list}>
-              {scanProgress.pending_confirmations.map((confirmation) => {
+            <div
+              className={styles.virtualInner}
+              style={{ height: `${virtualizer.getTotalSize()}px` }}
+            >
+              {virtualizer.getVirtualItems().map((virtualItem) => {
+                const confirmation = items[virtualItem.index];
                 const remembered = rememberMap[confirmation.id] || false;
                 return (
-                  <div key={confirmation.id} className={styles.item}>
-                    <div className={styles.itemInfo}>
-                      <ScrollingPath path={confirmation.path} />
-                      <div className={styles.itemCount}>
-                        包含 {confirmation.entry_count.toLocaleString()} 个子项
-                      </div>
-                    </div>
-                    <div className={styles.itemActions}>
-                      <div
-                        className={styles.rememberToggle}
-                        onClick={() => toggleRemember(confirmation.id)}
-                      >
-                        <div
-                          className={styles.toggleTrack}
-                          data-on={remembered}
-                        >
-                          <span className={styles.toggleThumb} />
+                  <div
+                    key={confirmation.id}
+                    className={styles.virtualItem}
+                    style={{ transform: `translateY(${virtualItem.start}px)` }}
+                  >
+                    <div className={styles.item}>
+                      <div className={styles.itemInfo}>
+                        <ScrollingPath path={confirmation.path} />
+                        <div className={styles.itemCount}>
+                          包含 {confirmation.entry_count.toLocaleString()} 个子项
                         </div>
-                        <span className={styles.toggleLabel}>
-                          {remembered ? "记住" : "仅本次"}
-                        </span>
                       </div>
-                      <div className={styles.divider} />
-                      <button
-                        className={styles.allow}
-                        onClick={() =>
-                          respondConfirmation(confirmation.id, true, remembered)
-                        }
-                      >
-                        允许
-                      </button>
-                      <button
-                        className={styles.deny}
-                        onClick={() =>
-                          respondConfirmation(confirmation.id, false, remembered)
-                        }
-                      >
-                        拒绝
-                      </button>
+                      <div className={styles.itemActions}>
+                        <div
+                          className={styles.rememberToggle}
+                          onClick={() => toggleRemember(confirmation.id)}
+                        >
+                          <div
+                            className={styles.toggleTrack}
+                            data-on={remembered}
+                          >
+                            <span className={styles.toggleThumb} />
+                          </div>
+                          <span className={styles.toggleLabel}>
+                            {remembered ? "记住" : "仅本次"}
+                          </span>
+                        </div>
+                        <div className={styles.divider} />
+                        <button
+                          className={styles.allow}
+                          onClick={() =>
+                            respondConfirmation(confirmation.id, true, remembered)
+                          }
+                        >
+                          允许
+                        </button>
+                        <button
+                          className={styles.deny}
+                          onClick={() =>
+                            respondConfirmation(confirmation.id, false, remembered)
+                          }
+                        >
+                          拒绝
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );

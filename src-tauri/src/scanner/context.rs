@@ -1,7 +1,8 @@
 use serde::{Deserialize, Serialize};
 
 use crate::config::ContentExtractionSettings;
-use crate::ocr::OcrProvider;
+use crate::ocr::queue::OcrTask;
+use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -37,7 +38,7 @@ pub struct ScanContext {
     pub ask_on_large_dir: bool,
     pub context_around: usize,
     pub content_extraction: ContentExtractionSettings,
-    pub ocr_provider: Option<Arc<dyn OcrProvider>>,
+    pub ocr_queue: Option<Sender<OcrTask>>,
 }
 
 pub fn extract_context(line: &str, keyword: &str, context_around: usize) -> String {

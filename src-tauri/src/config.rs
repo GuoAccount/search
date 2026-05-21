@@ -31,10 +31,16 @@ pub struct OcrSettings {
     pub api_secret: Option<String>,
     #[serde(default = "default_ocr_languages")]
     pub languages: Vec<String>,
+    #[serde(default = "default_ocr_concurrent")]
+    pub concurrent: usize,
 }
 
 fn default_ocr_languages() -> Vec<String> {
     vec!["zh-Hans".to_string(), "en-US".to_string()]
+}
+
+fn default_ocr_concurrent() -> usize {
+    2
 }
 
 impl Default for OcrSettings {
@@ -46,6 +52,7 @@ impl Default for OcrSettings {
             api_key: None,
             api_secret: None,
             languages: default_ocr_languages(),
+            concurrent: default_ocr_concurrent(),
         }
     }
 }

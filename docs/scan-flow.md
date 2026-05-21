@@ -19,6 +19,12 @@ BFS 线程 ──> work_tx ──> work_rx ──> Dispatcher 线程 ──> Ray
    ├─ ≤阈值目录: 发送 DirWork                              ├─ search_directory()
    ├─ >阈值目录: 发送确认请求                              ├─ 结果 → result_tx → Result Handler
    └─ 跳过规则: 记录 skipped_dirs                          └─ 进度 → progress_tx → Progress Handler
+                                                                         │
+                                                               图片文件 → OCR 队列（异步）
+                                                                         │
+                                                               OCR 工作线程（有限并发）
+                                                                         │
+                                                               OCR 结果 → result_tx
 ```
 
 ### 详细步骤
@@ -74,13 +80,20 @@ BFS 线程 ──> work_tx ──> work_rx ──> Dispatcher 线程 ──> Ray
 **③ Rayon 线程池**（`search_directory()`）：
 - 默认线程数 = CPU 核心数（自动限制并发，避免线程爆炸）
 - 对目录下的每个直接文件执行匹配：
-  - 文件名匹配（始终执行，不受扩展名过滤影响）
+  - OCR 文字识别 — 图片文件发送到 OCR 队列（异步，不阻塞 Rayon 线程）
+  - EXIF 数据匹配（仅限图片扩展名）
   - 文本内容匹配（仅限允许的扩展名）
   - 文档内容匹配（docx/xlsx/pptx/pdf，受 AppConfig.content_extraction 控制）
-  - EXIF 数据匹配（仅限图片扩展名）
-  - OCR 文字识别（仅限 macOS + 图片扩展名）
+  - 文件名匹配（始终执行，不受扩展名过滤影响）
 - 匹配结果通过 `result_tx` 发送
 - 进度更新通过 `progress_tx` 发送
+
+**⑤ OCR 队列**（`OcrQueue`）：
+- 独立于 Rayon 线程池，由专门的工作线程处理（默认 2 个并发）
+- Rayon 线程遇到图片文件时，将 `OcrTask` 发送到队列通道
+- OCR 工作线程从通道读取任务，调用 `ocr.recognize()` 执行识别
+- OCR 结果通过同一个 `result_tx` 发送回前端
+- 配置项 `ocr.concurrent` 控制并发数（1-8）
 
 **④ Result/Progress Handler 线程**：
 - 从 `result_rx` 读取结果，调用 `on_result` 回调写入 `ScanStore`
@@ -309,6 +322,13 @@ pub struct ContentExtractionSettings {
     pub pdf: bool,    // 默认 true
     pub pptx: bool,   // 默认 true
 }
+
+pub struct OcrSettings {
+    pub enabled: bool,           // 默认 false
+    pub provider: OcrProviderType,  // macos_native 或 api
+    pub languages: Vec<String>,  // 默认 ["zh-Hans", "en-US"]
+    pub concurrent: usize,       // OCR 并发工作线程数，默认 2
+}
 ```
 
 ---
@@ -341,7 +361,9 @@ pub struct ContentExtractionSettings {
 | | `extract_pdf_text()` | 提取 pdf 文本内容 |
 | | `extract_document_text()` | 文档文本提取路由函数 |
 | | `extract_exif()` | 提取 EXIF 数据 |
-| | `perform_ocr()` | OCR 识别 |
+| `src-tauri/src/ocr/queue.rs` | `OcrQueue::new()` | 创建 OCR 异步队列和工作线程 |
+| | `OcrQueue::process_task()` | OCR 单任务处理（识别 + 匹配 + 发送结果） |
+| | `OcrQueue::wait()` | 等待所有 OCR 工作线程完成 |
 | `src-tauri/src/commands/file_ops.rs` | `read_file_preview()` | 文件预览（通过 match_type 判断可预览性） |
 | | `read_text_content()` | 统一文本提取（纯文本 + 文档格式） |
 | | `move_to_trash()` | 移动到废纸篓 |
@@ -372,58 +394,62 @@ pub struct ContentExtractionSettings {
 ### 6.2 仍存在的问题
 
 1. **轮询间隔 200ms** — 频繁 IPC 调用，可考虑 Tauri 事件推送
-2. **确认面板缺少"记住选择"** — `remember` 参数未在 UI 中暴露
-3. **ScanStore 内存泄漏** — 完成的扫描记录不会自动清理
+2. **ScanStore 内存泄漏** — 完成的扫描记录不会自动清理
 
 ---
 
 ## 附录：新架构时序图
 
 ```
-┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌──────────────┐
-│   用户界面   │    │  Store层    │    │  Tauri命令   │    │   扫描引擎    │
-└──────┬──────┘    └──────┬──────┘    └──────┬──────┘    └──────┬───────┘
-       │                  │                  │                   │
-       │  点击搜索        │                  │                   │
-       │─────────────────>│                  │                   │
-       │                  │  startScan()     │                   │
-       │                  │─────────────────>│                   │
-       │                  │                  │  创建通道         │
-       │                  │                  │  start_scan()     │
-       │                  │                  │──────────────────>│
-       │                  │                  │                   │
-       │                  │                  │     BFS 线程启动   │
-       │                  │                  │     Dispatcher 启动│
-       │                  │                  │                   │
-       │                  │  get_scan_progress (每200ms)         │
-       │                  │─────────────────>│                   │
-       │                  │                  │  ScanProgress     │
-       │                  │<─────────────────│                   │
-       │  实时更新结果    │                  │                   │
-       │<─────────────────│                  │                   │
-       │                  │                  │                   │
-       │                  │  (遇到大目录)    │                   │
-       │                  │                  │  PendingConfirmation
-       │                  │<─────────────────│<──────────────────│
-       │  显示确认面板    │                  │                   │
-       │<─────────────────│                  │                   │
-       │                  │                  │                   │
-       │  用户确认允许    │                  │                   │
-       │─────────────────>│                  │                   │
-       │                  │  respond_confirmation                │
-       │                  │─────────────────>│                   │
-       │                  │                  │  work_tx.send()   │
-       │                  │                  │──────────────────>│
-       │                  │                  │                   │
-       │                  │                  │  Rayon 处理目录   │
-       │                  │                  │  结果实时返回     │
-       │                  │  get_scan_progress                   │
-       │                  │─────────────────>│                   │
-       │                  │  ScanProgress (含新结果)             │
-       │                  │<─────────────────│                   │
-       │  更新结果列表    │                  │                   │
-       │<─────────────────│                  │                   │
-       │                  │                  │                   │
-       │  扫描完成        │                  │                   │
-       │<─────────────────│<─────────────────│<──────────────────│
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌──────────────┐    ┌───────────┐
+│   用户界面   │    │  Store层    │    │  Tauri命令   │    │   扫描引擎    │    │  OCR 队列  │
+└──────┬──────┘    └──────┬──────┘    └──────┬──────┘    └──────┬───────┘    └─────┬─────┘
+       │                  │                  │                   │                  │
+       │  点击搜索        │                  │                   │                  │
+       │─────────────────>│                  │                   │                  │
+       │                  │  startScan()     │                   │                  │
+       │                  │─────────────────>│                   │                  │
+       │                  │                  │  创建通道         │                  │
+       │                  │                  │  创建 OCR 队列    │                  │
+       │                  │                  │  start_scan()     │                  │
+       │                  │                  │──────────────────>│                  │
+       │                  │                  │                   │                  │
+       │                  │                  │     BFS 线程启动   │                  │
+       │                  │                  │     Dispatcher 启动│                  │
+       │                  │                  │     OCR 工作线程启动                  │
+       │                  │                  │                   │                  │
+       │                  │  get_scan_progress (每200ms)         │                  │
+       │                  │─────────────────>│                   │                  │
+       │                  │                  │  ScanProgress     │                  │
+       │                  │<─────────────────│                   │                  │
+       │  实时更新结果    │                  │                   │                  │
+       │<─────────────────│                  │                   │                  │
+       │                  │                  │                   │                  │
+       │                  │                  │  Rayon 遇到图片   │                  │
+       │                  │                  │──────────────────────────────────────>│
+       │                  │                  │                   │                  │ OCR 识别
+       │                  │                  │  OCR 结果 (result_tx)               │
+       │                  │                  │<──────────────────────────────────────│
+       │                  │                  │                   │                  │
+       │                  │  (遇到大目录)    │                   │                  │
+       │                  │                  │  PendingConfirmation                  │
+       │                  │<─────────────────│<──────────────────│                  │
+       │  显示确认面板    │                  │                   │                  │
+       │<─────────────────│                  │                   │                  │
+       │                  │                  │                   │                  │
+       │  用户确认允许    │                  │                   │                  │
+       │─────────────────>│                  │                   │                  │
+       │                  │  respond_confirmation                │                  │
+       │                  │─────────────────>│                   │                  │
+       │                  │                  │  work_tx.send()   │                  │
+       │                  │                  │──────────────────>│                  │
+       │                  │                  │                   │                  │
+       │                  │                  │  扫描完成          │                  │
+       │                  │                  │  等待 OCR 队列    │                  │
+       │                  │                  │──────────────────────────────────────>│
+       │                  │                  │                   │                  │
+       │                  │                  │  OCR 队列完成      │                  │
+       │                  │                  │<──────────────────────────────────────│
+       │  扫描完成        │                  │                   │                  │
+       │<─────────────────│<─────────────────│<──────────────────│                  │
 ```

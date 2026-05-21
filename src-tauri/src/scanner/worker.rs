@@ -8,6 +8,7 @@ use super::context::{ScanContext, ScanResult, extract_context};
 use super::helpers::{is_hidden, matches_exclude, matches_rules, is_text_file, is_image_file, is_document_file};
 use super::document::extract_document_text;
 use super::matchers::extract_exif;
+use crate::ocr::queue::OcrTask;
 
 pub fn search_directory(
     dir: &Path,
@@ -71,39 +72,15 @@ pub fn search_directory(
 
         let mut matched = false;
 
-        // 1. OCR text matching
-        if !matched && ctx.scan_types.contains(&"ocr_text".to_string()) && is_image_file(&extension) {
-            if let Some(ref ocr) = ctx.ocr_provider {
-                match ocr.recognize(&path) {
-                    Ok(result) => {
-                        if !result.raw_text.is_empty() && result.raw_text.to_lowercase().contains(&ctx.keyword) {
-                            let matched_bboxes: Vec<serde_json::Value> = result.regions.iter()
-                                .filter(|r| r.text.to_lowercase().contains(&ctx.keyword))
-                                .map(|r| serde_json::json!({"x": r.x, "y": r.y, "w": r.w, "h": r.h}))
-                                .collect();
-                            let bboxes_json = if matched_bboxes.is_empty() {
-                                None
-                            } else {
-                                Some(serde_json::to_string(&matched_bboxes).unwrap_or_default())
-                            };
-                            let _ = result_tx.send(ScanResult {
-                                file_path: path.to_string_lossy().to_string(),
-                                file_name: file_name.clone(),
-                                match_type: "ocr".to_string(),
-                                match_line: None,
-                                match_context: Some(extract_context(&result.raw_text, &ctx.keyword, ctx.context_around)),
-                                match_bboxes: bboxes_json,
-                                file_size: metadata.len(),
-                                file_extension: extension.clone(),
-                                is_dir: false,
-                            });
-                            matched = true;
-                        }
-                    }
-                    Err(e) => {
-                        log::warn!("OCR failed for {}: {}", path.display(), e);
-                    }
-                }
+        // 1. OCR text matching — dispatch to async queue
+        if ctx.scan_types.contains(&"ocr_text".to_string()) && is_image_file(&extension) {
+            if let Some(ref ocr_tx) = ctx.ocr_queue {
+                let _ = ocr_tx.send(OcrTask {
+                    path: path.clone(),
+                    file_name: file_name.clone(),
+                    extension: extension.clone(),
+                    file_size: metadata.len(),
+                });
             }
         }
 

@@ -73,6 +73,7 @@
 
 .body {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 16px;
 }
@@ -91,11 +92,24 @@
   gap: 12px;
 }
 
+.virtualInner {
+  position: relative;
+  width: 100%;
+}
+
+.virtualItem {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+}
+
 .item {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 12px;
+  margin-bottom: 12px;
   background: var(--color-fill-secondary);
   border-radius: var(--radius-md);
 }
