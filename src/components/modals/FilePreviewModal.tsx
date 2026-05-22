@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useStore } from "../../store";
-import { Eye, X } from "lucide-react";
+import { Eye, X, Loader2 } from "lucide-react";
 import styles from "./FilePreviewModal.module.css";
 
 function highlightKeyword(text: string, keyword: string) {
@@ -64,7 +64,12 @@ export function FilePreviewModal() {
           </button>
         </div>
         <div className={styles.body}>
-          {previewFile.context_lines.length > 0 ? (
+          {previewFile.loading ? (
+            <div className={styles.loading}>
+              <Loader2 size={24} className={styles.spinner} />
+              <span>加载中...</span>
+            </div>
+          ) : previewFile.context_lines.length > 0 ? (
             <div className={styles.content}>
               {previewFile.context_lines.map((line, index) => (
                 <div

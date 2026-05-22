@@ -9,6 +9,7 @@ use super::helpers::{is_hidden, matches_exclude, matches_rules, is_text_file, is
 use super::document::extract_document_text;
 use super::matchers::extract_exif;
 use crate::ocr::queue::OcrTask;
+use super::pdf_queue::PdfTask;
 
 pub fn search_directory(
     dir: &Path,
@@ -137,24 +138,37 @@ pub fn search_directory(
                 _ => false,
             };
             if is_enabled {
-                if let Ok(content) = extract_document_text(&path, &extension) {
-                    let content_lower = content.to_lowercase();
-                    if content_lower.contains(&ctx.keyword) {
-                        let context_line = content.lines()
-                            .find(|line| line.to_lowercase().contains(&ctx.keyword))
-                            .unwrap_or("");
-                        let _ = result_tx.send(ScanResult {
-                            file_path: path.to_string_lossy().to_string(),
+                // PDF files go through queue to limit concurrency
+                if extension == "pdf" {
+                    if let Some(ref pdf_tx) = ctx.pdf_queue {
+                        let _ = pdf_tx.send(PdfTask {
+                            path: path.clone(),
                             file_name: file_name.clone(),
-                            match_type: "content".to_string(),
-                            match_line: None,
-                            match_context: Some(extract_context(context_line, &ctx.keyword, ctx.context_around)),
-                            match_bboxes: None,
+                            extension: extension.clone(),
                             file_size: metadata.len(),
-                            file_extension: extension.clone(),
-                            is_dir: false,
                         });
-                        matched = true;
+                    }
+                } else {
+                    // Other documents (docx, xlsx, pptx) process directly
+                    if let Ok(content) = extract_document_text(&path, &extension) {
+                        let content_lower = content.to_lowercase();
+                        if content_lower.contains(&ctx.keyword) {
+                            let context_line = content.lines()
+                                .find(|line| line.to_lowercase().contains(&ctx.keyword))
+                                .unwrap_or("");
+                            let _ = result_tx.send(ScanResult {
+                                file_path: path.to_string_lossy().to_string(),
+                                file_name: file_name.clone(),
+                                match_type: "content".to_string(),
+                                match_line: None,
+                                match_context: Some(extract_context(context_line, &ctx.keyword, ctx.context_around)),
+                                match_bboxes: None,
+                                file_size: metadata.len(),
+                                file_extension: extension.clone(),
+                                is_dir: false,
+                            });
+                            matched = true;
+                        }
                     }
                 }
             }

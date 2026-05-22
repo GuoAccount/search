@@ -167,6 +167,17 @@ export function ResultsTree() {
       }
       return;
     }
+    // Show modal immediately with loading state
+    setPreviewFile({
+      file_path: result.file_path,
+      file_name: result.file_name,
+      file_size: result.file_size,
+      file_type: result.file_extension,
+      match_line: result.match_line,
+      context_lines: [],
+      match_type: result.match_type,
+      loading: true,
+    });
     try {
       const { invoke } = await import("@tauri-apps/api/core");
       const preview = await invoke<any>("read_file_preview", {
@@ -180,6 +191,8 @@ export function ResultsTree() {
       setPreviewFile(preview);
     } catch (err) {
       console.error("Failed to read file:", err);
+      // Keep modal open but show error state
+      setPreviewFile(null);
     }
   }, [handleToggleFolder, settings.keyword, appConfig, setPreviewFile, setPreviewImage]);
 

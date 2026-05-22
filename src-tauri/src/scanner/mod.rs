@@ -3,6 +3,7 @@ mod context;
 mod document;
 mod helpers;
 mod matchers;
+mod pdf_queue;
 mod worker;
 
 pub use context::{ScanResult, ScanCallback, ScanContext, extract_context};
@@ -19,6 +20,7 @@ use crate::types::DirWork;
 use crate::config::AppConfig;
 use crate::ocr;
 use crate::ocr::queue::OcrQueue;
+use pdf_queue::PdfQueue;
 
 pub fn scan_directory(
     config: crate::types::ScanConfig,
@@ -64,6 +66,18 @@ pub fn scan_directory(
         (None, None)
     };
 
+    // PDF queue: limit concurrent PDF processing
+    let pdf_concurrent = 2; // Limit to 2 concurrent PDF extractions
+    let pdf_keyword = config.keyword.to_lowercase();
+    let pdf_context_around = app_config.display.match_context_length as usize;
+    let (pdf_queue_handle, pdf_task_tx) = PdfQueue::new(
+        pdf_concurrent,
+        pdf_keyword,
+        pdf_context_around,
+        result_tx.clone(),
+        cancel_flag.clone(),
+    );
+
     let ctx = Arc::new(ScanContext {
         keyword: config.keyword.to_lowercase(),
         scan_types: config.scan_types,
@@ -76,6 +90,7 @@ pub fn scan_directory(
         context_around: app_config.display.match_context_length as usize,
         content_extraction: app_config.content_extraction.clone(),
         ocr_queue: ocr_task_tx.clone(),
+        pdf_queue: Some(pdf_task_tx.clone()),
     });
 
     let bfs_ctx = ctx.clone();
@@ -168,6 +183,9 @@ pub fn scan_directory(
     if let Some(queue) = ocr_queue_handle {
         queue.wait_timeout(Duration::from_secs(30));
     }
+
+    drop(pdf_task_tx);
+    pdf_queue_handle.wait_timeout(Duration::from_secs(30));
 
     drop(result_tx);
     drop(progress_tx);

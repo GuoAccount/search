@@ -1,4 +1,5 @@
 import { useStore } from "../../store";
+import { invoke } from "@tauri-apps/api/core";
 import { PresetSelector } from "../PresetSelector/PresetSelector";
 import { DEFAULT_PRESETS } from "../../constants/presets";
 import { Sun, Moon, Monitor, Settings, FileText } from "lucide-react";
@@ -11,7 +12,6 @@ export function Sidebar() {
     setShowSettings,
     setLocalConfig,
     setConfigDirty,
-    setShowLogViewer,
     appConfig,
   } = useStore();
 
@@ -66,8 +66,8 @@ export function Sidebar() {
           </button>
           <button
             className={styles.settingsBtn}
-            onClick={() => setShowLogViewer(true)}
-            title="日志"
+            onClick={() => invoke('open_log_dir')}
+            title="打开日志目录"
           >
             <FileText size={14} />
           </button>

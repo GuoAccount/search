@@ -147,8 +147,30 @@ pub fn extract_pptx_text(path: &Path) -> Result<String, String> {
 }
 
 pub fn extract_pdf_text(path: &Path) -> Result<String, String> {
-    let path = path.to_path_buf();
     let display = path.display().to_string();
+    
+    // Try pdf_oxide first (better compatibility)
+    match std::panic::catch_unwind(|| {
+        let doc = pdf_oxide::document::PdfDocument::open(path)?;
+        doc.extract_all_text()
+    }) {
+        Ok(Ok(text)) if !text.trim().is_empty() => {
+            log::info!("PDF extracted via pdf_oxide: {}", display);
+            return Ok(text);
+        }
+        Ok(Ok(_)) => {
+            log::warn!("pdf_oxide returned empty text for {}, trying pdf_extract", display);
+        }
+        Ok(Err(e)) => {
+            log::warn!("pdf_oxide failed for {}: {}, trying pdf_extract", display, e);
+        }
+        Err(e) => {
+            log::warn!("pdf_oxide panicked for {}: {:?}, trying pdf_extract", display, e);
+        }
+    }
+    
+    // Fallback to pdf_extract
+    let path = path.to_path_buf();
     std::panic::catch_unwind(move || {
         pdf_extract::extract_text(&path)
     })

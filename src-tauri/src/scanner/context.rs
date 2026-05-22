@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::ContentExtractionSettings;
 use crate::ocr::queue::OcrTask;
+use super::pdf_queue::PdfTask;
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 
@@ -39,6 +40,7 @@ pub struct ScanContext {
     pub context_around: usize,
     pub content_extraction: ContentExtractionSettings,
     pub ocr_queue: Option<Sender<OcrTask>>,
+    pub pdf_queue: Option<Sender<PdfTask>>,
 }
 
 pub fn extract_context(line: &str, keyword: &str, context_around: usize) -> String {

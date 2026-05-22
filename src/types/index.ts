@@ -79,6 +79,7 @@ export interface FilePreview {
   match_line: number | null;
   context_lines: ContextLine[];
   match_type: string;
+  loading?: boolean;
 }
 
 export interface FileTypePreset {

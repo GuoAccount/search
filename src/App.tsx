@@ -11,7 +11,6 @@ import { SkippedDirsPanel } from "./components/modals/SkippedDirsPanel";
 import { SettingsPanel } from "./components/modals/SettingsPanel";
 import { FilePreviewModal } from "./components/modals/FilePreviewModal";
 import { ImagePreviewModal } from "./components/modals/ImagePreviewModal";
-import { LogViewer } from "./components/modals/LogViewer";
 import {
   PanelLeftClose,
   PanelLeftOpen,
@@ -170,7 +169,6 @@ function App() {
       <SettingsPanel />
       <FilePreviewModal />
       <ImagePreviewModal />
-      <LogViewer />
     </div>
   );
 }
